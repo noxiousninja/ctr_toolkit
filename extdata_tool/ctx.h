@@ -24,7 +24,17 @@ typedef enum
 } global_sizes;
 
 //Variable Structs
+typedef enum
+{
+	Good = 0,
+	Fail = 1
+} success_codes;
 
+typedef enum
+{
+	IO_ERROR = -1,
+} errors;
+/**
 typedef struct
 {
 	u8 used;
@@ -45,6 +55,8 @@ typedef struct
 	u8 *buffer;
 	u64 size;
 } COMPONENT_STRUCT;
+
+**/
 
 typedef enum
 {

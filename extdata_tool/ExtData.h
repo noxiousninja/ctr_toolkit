@@ -86,7 +86,8 @@ typedef struct
 	u64 hash_size;
 	u8 flags[4];
 	u64 data_partition_offset;
-} DIFI_STRUCT;
+} __attribute__((__packed__)) 
+DIFI_STRUCT;
 
 typedef struct
 {
@@ -134,7 +135,6 @@ typedef struct
 
 typedef struct
 {
-	u8 valid;
 	u64 DIFI_offset;
 	u32 active_table_offset; 
 	DIFI_STRUCT DIFI;
@@ -150,16 +150,12 @@ typedef struct
 } EXTDATA_CONTEXT;
 
 int GetExtDataContext(EXTDATA_CONTEXT *ctx, FILE *extdataimg);
+int GetExtdataPartitionData(PARTITION_STRUCT *partition, u64 offset, u32 active_table_offset, FILE *extdataimg);
 
 void print_extdata_header(EXTDATA_HEADER_CONTEXT header);
 void print_partition_info(PARTITION_STRUCT partition);
 void print_DIFI(PARTITION_STRUCT partition);
 void print_IVFC(PARTITION_STRUCT partition);
 void print_DPFS(PARTITION_STRUCT partition);
-
-PARTITION_STRUCT get_extdata_partition_header(u64 offset, u32 active_table_offset, FILE *extdataimg);
-
-int get_extdata_single_blob(char *filepath, u64 offset, u64 size, FILE *extdataimg);
-int get_extdata_duo_blob(char *filepath, u64 offset, u64 size, int suffix, FILE *extdataimg);
 
 #endif

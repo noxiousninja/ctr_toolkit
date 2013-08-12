@@ -1,20 +1,20 @@
 /**
 Copyright 2013 3DSGuy
 
-This file is part of extdata_tool.
+This file is part of make_cia.
 
-extdata_tool is free software: you can redistribute it and/or modify
+make_cia is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-extdata_tool is distributed in the hope that it will be useful,
+make_cia is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with extdata_tool.  If not, see <http://www.gnu.org/licenses/>.
+along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "lib.h"
 
@@ -46,7 +46,7 @@ void char_to_int_array(unsigned char destination[], char source[], int size, int
         }
     }
 	**/
-	free(byte_array);
+	_free(byte_array);
 }
 
 void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness)
@@ -109,72 +109,119 @@ void resolve_flag_u16(u16 flag, unsigned char *flag_bool)
 	}
 }
 
+int append_filextention(char *output, u16 max_outlen, char *input, char extention[])
+{
+	if(output == NULL || input == NULL){
+		printf("[!] Memory Error\n");
+		return Fail;
+	}
+	memset(output,0,max_outlen);
+	u16 extention_point = strlen(input)+1;
+	for(int i = strlen(input)-1; i > 0; i--){
+		if(input[i] == '.'){
+			extention_point = i;
+			break;
+		}
+	}
+	if(extention_point+strlen(extention) >= max_outlen){
+		printf("[!] Input File Name Too Large for Output buffer\n");
+		return Fail;
+	}
+	memcpy(output,input,extention_point);
+	sprintf(output,"%s%s",output,extention);
+	return 0;
+}
+
 //IO Related
+int ExportFileToFile(FILE *in, FILE *out, u64 size, u64 in_offset, u64 out_offset)
+{
+	u8 *buffer = malloc(size);
+	if(buffer == NULL)
+		return IO_ERROR;
+	ReadFile_64(buffer,size,in_offset,in);
+	WriteBuffer(buffer,size,out_offset,out);
+	return 0;
+}
+
 void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output)
 {
-	fseek(output,offset,SEEK_SET);
+	fseek_64(output,offset,SEEK_SET);
 	fwrite(buffer,size,1,output);
 } 
-#ifdef _WIN32
-int dotruncate(char *fn, u64 len)
+
+void ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
 {
+	fseek_64(file,offset,SEEK_SET);
+	fread(outbuff,size,1,file);
+}
+
+u64 GetFileSize_u64(char *filename)
+{
+	u64 size;
+#ifdef _WIN32
+	int fh;
+ 	u64 n;
+  	fh = _open( filename, 0 );
+  	n = _lseeki64(fh, 0, SEEK_END);
+	_close(fh);
+	size = (n / sizeof(short))*2;
+#else
+	FILE *file = fopen(filename,"rb");
+	fseeko(file, 0L, SEEK_END);
+	size = ftello(file);
+	fclose(file);
+#endif
+	return size;
+}
+
+u32 GetFileSize_u32(FILE *file)
+{
+	u32 size = 0;
+	fseek(file, 0L, SEEK_END);
+	size = ftell(file);
+	fseek(file, 0L, SEEK_SET);
+	return size;
+}
+
+int TruncateFile_u64(char *filename, u64 filelen)
+{
+#ifdef _WIN32
 	HANDLE fh;
  
 	LARGE_INTEGER fp;
-	fp.QuadPart = len;
+	fp.QuadPart = filelen;
  
-	fh = CreateFile(fn, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+	fh = CreateFile(filename, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 	if (fh == INVALID_HANDLE_VALUE) {
 		printf("[!] Invalid File handle\n");
-		//oops(fn);
 		return 1;
 	}
  
 	if (SetFilePointerEx(fh, fp, NULL, FILE_BEGIN) == 0 ||
 	    SetEndOfFile(fh) == 0) {
 		printf("[!] truncate failed\n");
-		//oops(fn);
 		CloseHandle(fh);
 		return 1;
 	}
  
 	CloseHandle(fh);
 	return 0;
-}
-
-u64 nsamples(char* filename)
-{
-  int fh;
-  u64 n;
-
-  /* Open file */
-  fh = _open( filename, 0 );
-
-  /* Find end of file */
-  n = _lseeki64(fh, 0, SEEK_END);
-
-  /* Close file */
-  _close(fh);
-
- return (n / sizeof(short))*2;
-}
-#endif
-/**
-u64 GetFileSize(FILE *file)
-{
-	u64 size = 0;
-#ifdef _WIN32
-	fseek(file, 0L, SEEK_END);
-	size = ftell(file);
-	fseek(file, 0L, SEEK_SET);
 #else
-	fseeko(file, 0L, SEEK_END);
-	size = ftello(file);
-	fseeko(file, 0L, SEEK_SET);
-#endif
-	return size;
+	return truncate(filename,filelen);
+#endif	
 }
-**/
+
+int fseek_64(FILE *fp, u64 file_pos, int whence)
+{
+#ifdef _WIN32
+	if(whence != SEEK_SET)
+		printf("[!] fseek_64, whence has been overided to SEEK_SET\n");
+	fpos_t pos = file_pos;
+	return fsetpos(fp,&pos); //I can't believe the 2gb problem with Windows & MINGW, maybe I have a bad installation :/
+#else
+	return fseeko(fp,file_pos,whence);
+#endif
+}
 
 int makedir(const char* dir)
 {
@@ -188,10 +235,16 @@ int makedir(const char* dir)
 char *getcwdir(char *buffer,int maxlen)
 {
 #ifdef _WIN32
-return _getcwd(buffer,maxlen);
+	return _getcwd(buffer,maxlen);
 #else
-return getcwd(buffer,maxlen);
+	return getcwd(buffer,maxlen);
 #endif
+}
+
+void _free(void *ptr)
+{
+	free(ptr);
+	ptr = NULL;
 }
 
 //Data Size conversion

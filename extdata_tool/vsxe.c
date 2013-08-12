@@ -105,21 +105,14 @@ int ExportExdataImagetoFile(FILE *extdata, FILE *outfile)
 	if(GetExtDataContext(&ctx,extdata) != 0)
 		return 1;
 	
+	//Checkng Type of 
 	if(ctx.partition[primary].DIFI.flags[0] != 1)
 		return UNEXPECTED_MULTIPLE_DATA_IN_EXTDATA;
 	
 	u64 offset = ctx.partition[primary].DIFI.data_partition_offset + ctx.partition[primary].DPFS.ivfc_offset;
 	u64 size = ctx.partition[primary].IVFC.level_4_fs_size;
 	
-	u8 *buffer = malloc(size);
-	
-	fseek(extdata,offset,SEEK_SET);
-	fseek(outfile,0,SEEK_SET);
-	fread(buffer,size,1,extdata);
-	fwrite(buffer,size,1,outfile);
-	
-	free(buffer);
-	return 0;
+	return ExportFileToFile(extdata,outfile,size,offset,0);
 }
 
 

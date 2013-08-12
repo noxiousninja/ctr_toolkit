@@ -39,8 +39,7 @@ int GetExtDataContext(EXTDATA_CONTEXT *ctx, FILE *extdataimg)
 	fread(&ctx->header.AES_MAC,0x10,1,extdataimg);
 	
 	if(ctx->header.DIFF.primary_partition_offset != 0){
-		ctx->partition[primary] = get_extdata_partition_header(ctx->header.DIFF.primary_partition_offset, ctx->header.DIFF.active_table_offset, extdataimg);
-		if(ctx->partition[primary].valid != 0){
+		if(GetExtdataPartitionData(&ctx->partition[primary],ctx->header.DIFF.primary_partition_offset, ctx->header.DIFF.active_table_offset, extdataimg) != 0){
 			printf("[!] Primary DIFI Partition Corrupt\n");
 			return DIFI_CORRUPT;
 		}
@@ -51,8 +50,7 @@ int GetExtDataContext(EXTDATA_CONTEXT *ctx, FILE *extdataimg)
 	}
 	
 	if(ctx->header.DIFF.secondary_partition_offset != 0){
-		ctx->partition[secondary] = get_extdata_partition_header(ctx->header.DIFF.secondary_partition_offset, ctx->header.DIFF.active_table_offset, extdataimg);
-		if(ctx->partition[secondary].valid != 0){
+		if(GetExtdataPartitionData(&ctx->partition[secondary],ctx->header.DIFF.secondary_partition_offset, ctx->header.DIFF.active_table_offset, extdataimg) != 0){
 			printf("[!] Secondary DIFI Partition Corrupt\n");
 			return DIFI_CORRUPT;
 		}
@@ -62,6 +60,37 @@ int GetExtDataContext(EXTDATA_CONTEXT *ctx, FILE *extdataimg)
 	}
 	return 0;
 }
+
+int GetExtdataPartitionData(PARTITION_STRUCT *partition, u64 offset, u32 active_table_offset, FILE *extdataimg)
+{
+	memset(partition,0,sizeof(PARTITION_STRUCT));
+	partition->DIFI_offset = offset;
+		
+	fseek(extdataimg,partition->DIFI_offset,SEEK_SET);
+	fread(&partition->DIFI,sizeof(DIFI_STRUCT),1,extdataimg);
+	
+	//Storing IVFC blob
+	fseek(extdataimg,(partition->DIFI_offset + partition->DIFI.ivfc_blob_offset),SEEK_SET);
+	fread(&partition->IVFC,sizeof(IVFC_STRUCT),1,extdataimg);
+	if(partition->IVFC.magic_0 != IVFC_MAGIC_0 || partition->IVFC.magic_1 != IVFC_MAGIC_1){
+		//printf("[!] Primary Partition IVFC Blob Corrupt\n");
+		return IVFC_CORRUPT;
+	}
+
+	//Storing DPFS blob
+	fseek(extdataimg,(partition->DIFI_offset + partition->DIFI.dpfs_blob_offset),SEEK_SET);
+	fread(&partition->DPFS,sizeof(DPFS_STRUCT),1,extdataimg);
+	if(partition->DPFS.magic_0 != DPFS_MAGIC_0 || partition->DPFS.magic_1 != DPFS_MAGIC_1){
+		//printf("[!] Primary Partition DPFS Blob Corrupt\n");
+		return DPFS_CORRUPT;
+	}
+	
+	//Storing DIFI hash
+	fseek(extdataimg,(partition->DIFI_offset + partition->DIFI.hash_offset),SEEK_SET);
+	fread(&partition->DIFI_HASH,sizeof(partition->DIFI_HASH),1,extdataimg);	
+	return 0;
+}
+
 
 void print_extdata_header(EXTDATA_HEADER_CONTEXT header)
 {
@@ -168,109 +197,4 @@ void print_DPFS(PARTITION_STRUCT partition)
 	//printf(" > Adjusted Offset:         0x%x\n",partition.DPFS.ivfc_offset + partition.active_table_offset);
 	printf(" > Length:                  0x%llx\n",partition.DPFS.ivfc_length);
 	printf(" > Block Size:              0x%x\n",1 << partition.DPFS.ivfc_block_size);
-}
-
-PARTITION_STRUCT get_extdata_partition_header(u64 offset, u32 active_table_offset, FILE *extdataimg)
-{
-	PARTITION_STRUCT partition;
-	memset(&partition,0,sizeof(PARTITION_STRUCT));
-	fseek(extdataimg,offset,SEEK_SET);
-	fread(&partition.DIFI,sizeof(DIFI_STRUCT),1,extdataimg);
-	if(partition.DIFI.magic_0 != DIFI_MAGIC_0 || partition.DIFI.magic_1 != DIFI_MAGIC_1){
-		//printf("[!] Primary Partition DIFI Header Corrupt\n");
-		partition.valid = DIFI_CORRUPT;
-		return partition;
-	}
-	partition.DIFI_offset = offset;
-	
-	//Storing IVFC blob
-	fseek(extdataimg,(partition.DIFI_offset + partition.DIFI.ivfc_blob_offset),SEEK_SET);
-	fread(&partition.IVFC,sizeof(IVFC_STRUCT),1,extdataimg);
-	if(partition.IVFC.magic_0 != IVFC_MAGIC_0 || partition.IVFC.magic_1 != IVFC_MAGIC_1){
-		//printf("[!] Primary Partition IVFC Blob Corrupt\n");
-		partition.valid = IVFC_CORRUPT;
-		return partition;
-	}
-
-	//Storing DPFS blob
-	fseek(extdataimg,(partition.DIFI_offset + partition.DIFI.dpfs_blob_offset),SEEK_SET);
-	fread(&partition.DPFS,sizeof(DPFS_STRUCT),1,extdataimg);
-	if(partition.DPFS.magic_0 != DPFS_MAGIC_0 || partition.DPFS.magic_1 != DPFS_MAGIC_1){
-		//printf("[!] Primary Partition DPFS Blob Corrupt\n");
-		partition.valid = DPFS_CORRUPT;
-		return partition;
-	}
-	
-	//Storing DIFI hash
-	fseek(extdataimg,(partition.DIFI_offset + partition.DIFI.hash_offset),SEEK_SET);
-	fread(&partition.DIFI_HASH,sizeof(partition.DIFI_HASH),1,extdataimg);
-	
-	partition.valid = 0;
-	return partition;
-}
-
-int get_extdata_single_blob(char *filepath, u64 offset, u64 size, FILE *extdataimg)
-{
-	/**
-	u8 MAGIC_tmp[10];
-	memset(&MAGIC_tmp,0x0,0x10);
-
-	//Reading MAGIC of output data
-	fseek(extdataimg,offset,SEEK_SET);
-	fread(MAGIC_tmp,4,1,extdataimg);
-	
-	//Preparing Output Data file
-	u8 out_name[8];
-	//char hi[10] = {"tmp"};
-	sprintf(out_name, "%s.bin",MAGIC_tmp);
-	//sprintf(out_name, "%s.bin",hi);
-	**/
-	//Storing Output Data
-	u8 *tmp = malloc(size);
-	fseek(extdataimg,offset,SEEK_SET);
-	fread(tmp,size,1,extdataimg);
-	FILE *output_data = fopen(filepath,"wb");
-	if(output_data == NULL){
-		printf("[!] Could Not create %s\n",filepath);
-		free(tmp);
-		return IO_FAIL;
-	}
-	printf("[+] Writing %s ...\n",filepath);
-	fwrite(tmp,size,1,output_data);
-	fclose(output_data);
-	free(tmp);
-	printf("Hi\n");
-	return 0;
-}
-
-int get_extdata_duo_blob(char *filepath, u64 offset, u64 size, int suffix, FILE *extdataimg)
-{
-	//Reading MAGIC of output data
-	u8 MAGIC_tmp[10];
-	memset(&MAGIC_tmp,0x0,0x10);
-	
-	fseek(extdataimg,offset,SEEK_SET);
-	fread(MAGIC_tmp,4,1,extdataimg);
-		
-	//Preparing Output Data file
-	char out_name[100];
-	sprintf(out_name, "%d_%s",suffix,filepath);
-	
-	
-	
-	//Storing Output Data
-	u8 *tmp = malloc(size);
-	fseek(extdataimg,offset,SEEK_SET);
-	fread(tmp,size,1,extdataimg);
-	FILE *output_data = fopen(out_name,"wb");
-	if(output_data == NULL){
-		printf("[!] Could Not create %s\n",out_name);
-		free(tmp);
-		return IO_FAIL;
-	}
-	printf("[+] Writing %s\n",out_name);
-	fwrite(tmp,size,1,output_data);
-	fclose(output_data);
-	free(tmp);
-	return 0;
 }
