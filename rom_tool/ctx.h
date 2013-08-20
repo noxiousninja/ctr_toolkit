@@ -20,31 +20,16 @@ typedef enum
 	CFA_Update
 } ncch_types;
 
+typedef enum
+{
+	info = 0,
+	restore = 1,
+	trim = 2,
+	supertrim = 3,
+	extract = 4,
+} flag_index;
+
 //Variable Structs
-
-typedef struct
-{
-	u8 used;
-	FILE *file;
-} __attribute__((__packed__)) 
-F_OPTION_CTX;
-
-typedef struct
-{
-	u8 used;
-	char *argument;
-	u8 arg_len;
-	F_OPTION_CTX file;
-} __attribute__((__packed__)) 
-OPTION_CTX;
-
-typedef struct
-{
-	u8 used;
-	u8 *buffer;
-	u64 size;
-} __attribute__((__packed__)) 
-COMPONENT_STRUCT;
 
 typedef struct
 {
@@ -79,8 +64,6 @@ typedef struct
 	NCSD_STRUCT *ncsd_struct;
 	
 	//Settings
-	u8 info_flag;
-	u8 rom_restore_flag;
-	u8 rom_trim_flag;
+	u8 flags[5];
 } __attribute__((__packed__)) 
 ROM_CONTEXT;

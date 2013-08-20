@@ -2,8 +2,9 @@ typedef enum
 {
 	retail = 1,
 	dev_internal_SDK,
-	dev_external_SDK
-} ROM_TYPES;
+	dev_external_SDK,
+	nand
+} ncsd_types;
 
 typedef enum
 {
@@ -125,16 +126,12 @@ typedef struct
 **/
 
 int NCSDProcess(ROM_CONTEXT *ctx);
-void PatchFWVersion(ROM_CONTEXT *ctx, u16 version);
-void PatchRegion(ROM_CONTEXT *ctx, u32 cver_tid_low);
-int StripUpdate_0(ROM_CONTEXT *ctx, u16 version);
-int StripUpdate_1(ROM_CONTEXT *ctx, u16 version);
-void WipeRetailCCIData(ROM_CONTEXT *ctx);
-
+int GetNCSDData(ROM_CONTEXT *ctx);
 int TrimROM(ROM_CONTEXT *ctx);
 int RestoreROM(ROM_CONTEXT *ctx);
-
+int ExtractROMPartitions(ROM_CONTEXT *ctx);
 void WriteDummyBytes(FILE *file, u8 dummy_byte, u64 len);
-int GetNCSDData(ROM_CONTEXT *ctx);
 void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info);
+void GetCHIPFullSize(/*char *string,*/u64 size, int type);
+void GetROMUsedSize(/*char *string,*/u64 expected_size, u64 actual_size, int type);
 void GetMin3DSFW(char *FW_STRING, CARD_INFO_HEADER *card_info);

@@ -17,6 +17,7 @@ typedef enum
 {
 	ARGC_FAIL = 1,
 	ARGV_FAIL,
+	IO_ERROR,
 	aes_key_fail,
 	rsa_key_fail,
 	cia_type_fail,
