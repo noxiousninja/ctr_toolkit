@@ -5,7 +5,7 @@
 typedef enum
 {
 	MAJOR = 2,
-	MINOR = 6
+	MINOR = 7
 } AppVer;
 
 void app_title(void);
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 			ctx->flags[trim] = True;
 			ctx->flags[supertrim] = True;
 		}
-		else if(strcmp(argv[i], "-x") == 0 && ctx->flags[extract] == False && i < (argc - 1)){
+		else if(strcmp(argv[i], "-x") == 0 && ctx->flags[extract] == False && i+1 < (argc - 1)){
 			ctx->flags[extract] = True;
 			ctx->outfile.arg_len = strlen(argv[i+1]);
 			ctx->outfile.argument = malloc(ctx->outfile.arg_len);
@@ -79,6 +79,19 @@ int main(int argc, char *argv[])
 	if(ctx->flags[restore] == True && ctx->flags[trim] == True){
 		printf("[!] You cannot trim and restore a ROM at the same time\n");
 		help(argv[0]);
+		free_buffers(ctx);
+		return 1;
+	}
+	
+	int Action = 0;
+	for(int i = 0; i < 5; i++){
+		if(ctx->flags[i] == True)
+			Action++;
+	}
+	if(!Action){
+		printf("[!] Nothing To Do\n");
+		help(argv[0]);
+		free_buffers(ctx);
 		return 1;
 	}
 		
@@ -121,11 +134,11 @@ void help(char *app_name)
 {
 	app_title();
 	printf("Usage: %s [options] <rom filepath>\n", app_name);
-	printf("OPTIONS                 Explanation\n");
-	printf(" -h, --help             Print this help.\n");
-	printf(" -i, --info             Print 3DS ROM Info\n");
-	printf(" -r, --restore          Restore(Un-Trim) 3DS ROM File.\n");
-	printf(" -t, --trim             Trim 3DS ROM File.\n");
-	printf(" -s, --supertrim        Same as '-t' but removes the update partition\n");
-	printf(" -x, --extract=         Extract NCSD Partitions\n");
+	printf("OPTIONS            Possible Values         Explanation\n");
+	printf(" -h, --help                                Print this help.\n");
+	printf(" -i, --info                                Print 3DS ROM Info\n");
+	printf(" -r, --restore                             Restore(Un-Trim) 3DS ROM File.\n");
+	printf(" -t, --trim                                Trim 3DS ROM File.\n");
+	printf(" -s, --supertrim                           Same as '-t' but removes the update partition\n");
+	printf(" -x, --extract=    File-out Prefix         Extract NCSD Partitions\n");
 }
