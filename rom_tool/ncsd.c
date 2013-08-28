@@ -179,17 +179,24 @@ int ExtractROMPartitions(ROM_CONTEXT *ctx)
 	FILE *rom = fopen(ctx->romfile.argument,"rb");
 	if(rom == NULL)
 		return Fail;
+		
+	chdir(ctx->outfile.argument);
+	
 	for(int i = 0; i < 8; i++){
 		if(ctx->ncsd_struct->partition_data[i].active == True && ctx->ncsd_struct->partition_data[i].offset < ctx->ncsd_struct->actual_rom_file_size){
 			char output[1024];
 			memset(&output,0,1024);
-			switch(ctx->ncsd_struct->partition_data[i].content_type){
-				case CXI : snprintf(output,1024,"%s_%d_%s_APPDATA.cxi",ctx->outfile.argument,i,ctx->ncsd_struct->partition_data[i].product_code); break;
-				case CFA_Manual : snprintf(output,1024,"%s_%d_%s_MANUAL.cfa",ctx->outfile.argument,i,ctx->ncsd_struct->partition_data[i].product_code); break;
-				case CFA_DLPChild : snprintf(output,1024,"%s_%d_%s_DLP.cfa",ctx->outfile.argument,i,ctx->ncsd_struct->partition_data[i].product_code); break;
-				case CFA_Update : snprintf(output,1024,"%s_%d_%s_UPDATEDATA.cfa",ctx->outfile.argument,i,ctx->ncsd_struct->partition_data[i].product_code); break;
-				default: snprintf(output,1024,"%s_%d.bin",ctx->outfile.argument,i); break;
+			if(ctx->ncsd_struct->type != nand){
+				switch(ctx->ncsd_struct->partition_data[i].content_type){
+					case CXI : snprintf(output,1024,"%s_%d_APPDATA.cxi",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+					case CFA_Manual : snprintf(output,1024,"%s_%d_MANUAL.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+					case CFA_DLPChild : snprintf(output,1024,"%s_%d_DLP.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+					case CFA_Update : snprintf(output,1024,"%s_%d_UPDATEDATA.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+					default: snprintf(output,1024,"%s_%d.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+				}
 			}
+			else
+				snprintf(output,1024,"%d.bin",i);
 			FILE *out = fopen(output,"wb");
 			if(out == NULL){
 				fclose(rom);

@@ -5,7 +5,7 @@
 typedef enum
 {
 	MAJOR = 2,
-	MINOR = 7
+	MINOR = 8
 } AppVer;
 
 void app_title(void);
@@ -140,5 +140,5 @@ void help(char *app_name)
 	printf(" -r, --restore                             Restore(Un-Trim) 3DS ROM File.\n");
 	printf(" -t, --trim                                Trim 3DS ROM File.\n");
 	printf(" -s, --supertrim                           Same as '-t' but removes the update partition\n");
-	printf(" -x, --extract=    File-out Prefix         Extract NCSD Partitions\n");
+	printf(" -x, --extract=    Dir-out                 Extract NCSD Partitions to directory\n");
 }
