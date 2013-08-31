@@ -1,20 +1,20 @@
 /**
 Copyright 2013 3DSGuy
 
-This file is part of make_cia.
+This file is part of extdata_tool.
 
-make_cia is free software: you can redistribute it and/or modify
+extdata_tool is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-make_cia is distributed in the hope that it will be useful,
+extdata_tool is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
+along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 **/
 #ifndef _UTILS_H_
 #define _UTILS_H_
@@ -38,14 +38,14 @@ void char_to_int_array(unsigned char destination[], char source[], int size, int
 void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness);
 void u8_hex_print_be(u8 *array, int len);
 void u8_hex_print_le(u8 *array, int len);
-u32 align_value(u32 value, u32 alignment);
+u64 align_value(u64 value, u64 alignment);
 void resolve_flag(unsigned char flag, unsigned char *flag_bool);
 void resolve_flag_u16(u16 flag, unsigned char *flag_bool);
 int append_filextention(char *output, u16 max_outlen, char *input, char extention[]); 
 //IO Related
 int ExportFileToFile(FILE *in, FILE *out, u64 size, u64 in_offset, u64 out_offset);
 void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output);
-void ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file);
+int ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file);
 u64 GetFileSize_u64(char *filename);
 u32 GetFileSize_u32(FILE *file);
 int TruncateFile_u64(char *filename, u64 filelen);
@@ -53,7 +53,7 @@ int fseek_64(FILE *fp, u64 file_pos, int whence);
 int makedir(const char* dir);
 char *getcwdir(char *buffer,int maxlen);
 void _free(void *ptr); // frees and nullifies pointer
-//Data Size conversion
+//Data Type Size conversion
 u16 u8_to_u16(u8 *value, u8 endianness);
 u32 u8_to_u32(u8 *value, u8 endianness);
 u64 u8_to_u64(u8 *value, u8 endianness);
@@ -63,3 +63,7 @@ int u64_to_u8(u8 *out_value, u64 in_value, u8 endianness);
 //from ctrtool
 void memdump(FILE* fout, const char* prefix, const u8* data, u32 size);
 
+// Adapted from http://rosettacode.org/wiki/Sorting_algorithms/Merge_sort#C
+void merge(u64 *left, int l_len, u64 *right, int r_len, u64 *out);
+void recur(u64 *buf, u64 *tmp, int len);
+void merge_sort(u64 *buf, int len);

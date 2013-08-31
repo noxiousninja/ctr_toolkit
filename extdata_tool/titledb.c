@@ -25,187 +25,173 @@ const char TitlePlatformString[2][5] = {"CTR","TWL"};
 const char TitleTypeString[2][8] = {"","System "};
 const char TitleAppTypeString[9][20] = {"Application","DLP Child","Demo","Add-on Content","DLC Content","Applet","Module","Data Archive","Firmware"};
 
-int ProcessTitleDB(FILE *tdb, int Mode, u64 offset)
+static DATABASE_CONTEXT db_ctx;
+
+// Private Prototypes
+void GetDB_Type(char *db_type_magic);
+void ProcessDB_Header(void);
+int GetEntry_Header(void);
+void PopulateDatabase(void);
+void PrintDatabase(void);
+void PrintTitleData(TITLE_CONTEXT *TitleData);
+int EntryUsed(TITLE_CONTEXT *TitleData);
+int EntryValid(TITLE_CONTEXT *TitleData);
+void PrintTitleIndexData(TITLE_INDEX_ENTRY_STRUCT *index);
+void PrintTitleInfoData(TITLE_INFO_ENTRY_STRUCT *info);
+void GetTitleType(u8 TitleID[8]);
+void ListDatabase(void);
+u32 GetValidEntryCount(void);
+void CollectTitleIDs(u64 *TitleID_DB, u32 ContentCount);
+void SortTitleIDs(u64 *TitleID_DB, u32 ContentCount);
+void ListTitleIDs(u64 *TitleID_DB, u32 ContentCount);
+
+// Code
+int IsTitleDB(u8 *db)
 {
-	//TODO Establish a proper DB context
-	DATABASE_CONTEXT *ctx = malloc(sizeof(DATABASE_CONTEXT));
-	memset(ctx,0x0,sizeof(DATABASE_CONTEXT));
-	ctx->db = tdb;
-	ctx->core_data.db_offset = offset;
+	BDRI_STRUCT *bdri = (BDRI_STRUCT*)(db+0x80);
+	if(memcmp(bdri->magic_0,BDRI_MAGIC,4) == 0 && u8_to_u32(bdri->magic_1,BE) == 0x300)
+		return True;
+	return False;
+}
+
+int ProcessTitleDB(u8 *db, int Mode)
+{
+	memset(&db_ctx,0x0,sizeof(DATABASE_CONTEXT));
+	db_ctx.db = (db + 0x80);	
+	GetDB_Type((char*)db);
+	ProcessDB_Header();
 	
-	if(GetDB_Header(ctx) != ValidDB){
+	if(GetEntry_Header() != ValidDB){
 		printf("[!] Error\n");
 		return CorruptDB;
 	}
-	
-	ProcessDB_Header(ctx);
-	
-	if(GetEntry_Header(ctx) != ValidDB){
-		printf("[!] Error\n");
-		return CorruptDB;
-	}
 
-	PopulateDatabase(ctx);
+	PopulateDatabase();
 
-	if(Mode == Normal)
-		PrintDatabase(ctx);
-	if(Mode == ByTID)
-		ListDatabase(ctx);
+	if(Mode == DB_Normal)
+		PrintDatabase();
+	if(Mode == DB_ByTID)
+		ListDatabase();
 
-	if(ctx->database.BufferAllocated == True){
-		free(ctx->database.TitleData);
+	if(db_ctx.database.BufferAllocated == True){
+		free(db_ctx.database.TitleData);
 	}
 	return 0;
 }
 
-int GetDB_Header(DATABASE_CONTEXT *ctx)
-{
-	fseek(ctx->db,ctx->core_data.db_offset,SEEK_SET);
-	char db_type_magic[0x8];
-	fread(db_type_magic,sizeof(db_type_magic),1,ctx->db);
-	GetDB_Type(ctx,db_type_magic);
-	if(ctx->core_data.db_type == Invalid){
-		return CorruptDB;
-	}
-	fseek(ctx->db,ctx->core_data.db_offset + 0x80,SEEK_SET);
-	fread(&ctx->header,sizeof(BDRI_STRUCT),1,ctx->db);
-	if(CheckDB_Header(ctx) == Invalid){
-		printf("[!] Embedded BDRI section is Missing or Corrupt\n");
-		return CorruptDB;
-	}
-	return ValidDB;
-}
-
-void GetDB_Type(DATABASE_CONTEXT *ctx, char db_type_magic[8])
+void GetDB_Type(char *db_type_magic)
 {
 	for(int i = 0; i < 4; i++){
 		if(memcmp(DB_MAGIC[i],db_type_magic,7) == 0){
-			ctx->core_data.db_type = i + 1;
+			db_ctx.core_data.db_type = i + 1;
 			return;
 		}
 	}
-	ctx->core_data.db_type = Invalid;
+	db_ctx.core_data.db_type = Invalid;
 }
 
-int CheckDB_Header(DATABASE_CONTEXT *ctx)
+void ProcessDB_Header(void)
 {
-	if(memcmp(ctx->header.magic_0,BDRI_MAGIC,4) != 0 || u8_to_u32(ctx->header.magic_1,BIG_ENDIAN) != 0x300)
-		return Invalid;
-	return Valid;
+	db_ctx.header = (BDRI_STRUCT*)db_ctx.db;
+	db_ctx.core_data.EntryTableOffset = u8_to_u64(db_ctx.header->Entry_Table_Offset,LE);
 }
 
-void ProcessDB_Header(DATABASE_CONTEXT *ctx)
+int GetEntry_Header(void)
 {
-	ctx->core_data.EntryTableOffset = ctx->core_data.db_offset + 0x80 + u8_to_u64(ctx->header.Entry_Table_Offset,LITTLE_ENDIAN);
-	//ctx->core_data.EntryTableSize = (u8_to_u32(ctx->header.Entry_Table_Size,LITTLE_ENDIAN) * u8_to_u32(ctx->header.Entry_Table_Media_Size,LITTLE_ENDIAN));
-	//ctx->core_data.InfoTableOffset = ctx->core_data.EntryTableOffset + (u8_to_u32(ctx->header.Info_Table_Offset,LITTLE_ENDIAN) * u8_to_u32(ctx->header.Info_Table_Offset_Medias,LITTLE_ENDIAN));
-	//printf("Entry Table Offset: 0x%x\n",ctx->core_data.EntryTableOffset);
-	//printf("Entry Table Size: 0x%x\n",ctx->core_data.EntryTableSize);
-	//printf("Info Table Offset: 0x%x\n",ctx->core_data.InfoTableOffset);
-}
-
-int GetEntry_Header(DATABASE_CONTEXT *ctx)
-{
-	fseek(ctx->db,ctx->core_data.EntryTableOffset,SEEK_SET);
-	fread(&ctx->entry_table_header,sizeof(ENTRY_TABLE_HEADER),1,ctx->db);
-	if(u8_to_u32(ctx->entry_table_header.magic_0,LITTLE_ENDIAN) != 0x2 || u8_to_u32(ctx->entry_table_header.magic_1,LITTLE_ENDIAN) != 0x3 ){
+	db_ctx.entry_table_header = (ENTRY_TABLE_HEADER*)(db_ctx.db + db_ctx.core_data.EntryTableOffset);
+	if(u8_to_u32(db_ctx.entry_table_header->magic_0,LE) != 0x2 || u8_to_u32(db_ctx.entry_table_header->magic_1,LE) != 0x3 ){
 		printf("[!] Embedded Title Entry Table section is Missing or Corrupt\n");
 		return CorruptDB;
 	}
-	ctx->database.TitleCount = u8_to_u32(ctx->entry_table_header.entry_count,LITTLE_ENDIAN);
-	ctx->database.MaxCount = u8_to_u32(ctx->entry_table_header.max_entry_count,LITTLE_ENDIAN);
+	db_ctx.database.TitleCount = u8_to_u32(db_ctx.entry_table_header->entry_count,LE);
+	db_ctx.database.MaxCount = u8_to_u32(db_ctx.entry_table_header->max_entry_count,LE);
 	return ValidDB;
 }
 
-void PopulateDatabase(DATABASE_CONTEXT *ctx)
+void PopulateDatabase(void)
 {
-	ctx->database.BufferAllocated = True;
-	ctx->database.TitleData = malloc(sizeof(TITLE_CONTEXT)*ctx->database.MaxCount);
-	memset(ctx->database.TitleData,0x0,(sizeof(TITLE_CONTEXT)*ctx->database.MaxCount));
+	db_ctx.database.BufferAllocated = True;
+	db_ctx.database.TitleData = malloc(sizeof(TITLE_CONTEXT)*db_ctx.database.MaxCount);
+	memset(db_ctx.database.TitleData,0x0,(sizeof(TITLE_CONTEXT)*db_ctx.database.MaxCount));
 	
-	for(u32 i = 0; i < ctx->database.MaxCount; i++){
-		u32 entry_offset = (ctx->core_data.EntryTableOffset + sizeof(ENTRY_TABLE_HEADER) + (i * sizeof(TITLE_INDEX_ENTRY_STRUCT)));
-		TITLE_INDEX_ENTRY_STRUCT temp;
-		fseek(ctx->db,entry_offset,SEEK_SET);
-		fread(&temp,sizeof(TITLE_INDEX_ENTRY_STRUCT),1,ctx->db);
-		if(u8_to_u32(temp.Active_Entry,LITTLE_ENDIAN) == True){
-			u32 Index = u8_to_u32(temp.Index,LITTLE_ENDIAN);
-			u32 info_offset = (ctx->core_data.EntryTableOffset + (u8_to_u32(temp.Title_Info_Offset,LITTLE_ENDIAN) * u8_to_u32(temp.Title_Info_Offset_Media,LITTLE_ENDIAN)));
-			StoreTitleEntry(&ctx->database.TitleData[Index],entry_offset,info_offset,ctx->db);
+	for(u32 i = 0; i < db_ctx.database.MaxCount; i++){
+		u32 entry_offset = (db_ctx.core_data.EntryTableOffset + sizeof(ENTRY_TABLE_HEADER) + (i * sizeof(TITLE_INDEX_ENTRY_STRUCT)));
+		TITLE_INDEX_ENTRY_STRUCT *temp = (TITLE_INDEX_ENTRY_STRUCT*)(db_ctx.db+entry_offset);
+		if(u8_to_u32(temp->Active_Entry,LE) == True){
+			u32 Index = u8_to_u32(temp->Index,LE);
+			u32 info_offset = (db_ctx.core_data.EntryTableOffset + (u8_to_u32(temp->Title_Info_Offset,LE) * u8_to_u32(temp->Title_Info_Offset_Media,LE)));
+			db_ctx.database.TitleData[Index].index = temp;
+			db_ctx.database.TitleData[Index].info = (TITLE_INFO_ENTRY_STRUCT*)(db_ctx.db+info_offset);
 		}
 	}
-}
-
-void StoreTitleEntry(TITLE_CONTEXT *TitleData, u32 entry_offset, u32 info_offset, FILE *db)
-{
-	fseek(db,entry_offset,SEEK_SET);
-	fread(&TitleData->index,sizeof(TITLE_INDEX_ENTRY_STRUCT),1,db);
-	fseek(db,info_offset,SEEK_SET);
-	fread(&TitleData->info,sizeof(TITLE_INFO_ENTRY_STRUCT),1,db);
 } 
 
-void PrintDatabase(DATABASE_CONTEXT *ctx)
+void PrintDatabase(void)
 {
 	printf("[+] Database Info:\n");
 	printf(" Title Database Type: ");
-	switch(ctx->core_data.db_type){
+	switch(db_ctx.core_data.db_type){
 		case NANDTDB : printf("NAND Title Database \n"); break;
 		case NANDIDB : printf("NAND Title Import Database \n"); break;
 		case TEMPTDB : printf("SDMC Title Database \n"); break;
 		case TEMPIDB : printf("NAND DLP Child Temporary Database \n"); break;
 		default : printf("Unknown\n"); break;
-	}
-	printf(" Active Entries:      %d\n",GetValidEntryCount(ctx));
-	printf(" Maximum Entries:     %d\n",ctx->database.MaxCount);
+	}	
+	printf(" Active Entries:      %d\n",GetValidEntryCount());
+	printf(" Maximum Entries:     %d\n",db_ctx.database.MaxCount);
 	printf("[+] Titles Entries in Database:\n");
-	for(u32 i = 0; i < ctx->database.MaxCount; i++){
-		PrintTitleData(&ctx->database.TitleData[i]);
+	for(u32 i = 0; i < db_ctx.database.MaxCount; i++){
+		PrintTitleData(&db_ctx.database.TitleData[i]);
 	}
 }
 
 void PrintTitleData(TITLE_CONTEXT *TitleData)
 {
-	if(EntryUsed(TitleData) == Invalid){
+	if(EntryUsed(TitleData)){
 		printf(" [+]: Unused\n");
 		return;
 	}
-	if(EntryUsed(TitleData) == Invalid){
+	if(EntryValid(TitleData)){
 		printf(" [+]: Invalid\n");
 		return;
 	}
-	PrintTitleIndexData(&TitleData->index);
-	PrintTitleInfoData(&TitleData->info);
+	PrintTitleIndexData(TitleData->index);
+	PrintTitleInfoData(TitleData->info);
 }
 
 int EntryUsed(TITLE_CONTEXT *TitleData)
 {
-	if(u8_to_u32(TitleData->index.Active_Entry,LITTLE_ENDIAN) != True)
+	if(TitleData->index == NULL)
+		return Invalid;
+	if(u8_to_u32(TitleData->index->Active_Entry,LE) != True)
 		return Invalid;
 	return Valid;
 }
 
 int EntryValid(TITLE_CONTEXT *TitleData)
 {
-	if(u8_to_u32(TitleData->info.Title_Type,LITTLE_ENDIAN) == 0x0)
+	if(TitleData->info == NULL)
+		return Invalid;
+	if(u8_to_u32(TitleData->info->Title_Type,LE) == 0x0)
 		return Invalid;
 	return Valid;
 }
 
 void PrintTitleIndexData(TITLE_INDEX_ENTRY_STRUCT *index)
 {
-	printf(" [+]: %d\n",u8_to_u32(index->Index,LITTLE_ENDIAN));
+	printf(" [+]: %d\n",u8_to_u32(index->Index,LE));
 	printf(" TitleID:                    "); u8_hex_print_le(index->Title_ID, 8); printf("\n");
 	GetTitleType(index->Title_ID);
 }
 
 void PrintTitleInfoData(TITLE_INFO_ENTRY_STRUCT *info)
 {
-	printf(" Product Code:               "); print_product_code(info->Product_Code); putchar('\n');
-	printf(" Title Type:                 %x\n",u8_to_u32(info->Title_Type,LITTLE_ENDIAN));
-	printf(" Title Version:              v%d\n",u8_to_u16(info->Title_Version,LITTLE_ENDIAN));
-	printf(" TMD Content ID:             %08x\n",u8_to_u32(info->TMD_File_ID,LITTLE_ENDIAN));
-	printf(" CMD Content ID:             %08x\n",u8_to_u32(info->CMD_File_ID,LITTLE_ENDIAN));
-	printf(" ExtdataID low:              %08x\n",u8_to_u32(info->ExtData_ID,LITTLE_ENDIAN));
+	printf(" Product Code:               %.16s\n",info->Product_Code);
+	printf(" Title Type:                 %x\n",u8_to_u32(info->Title_Type,LE));
+	printf(" Title Version:              v%d\n",u8_to_u16(info->Title_Version,LE));
+	printf(" TMD Content ID:             %08x\n",u8_to_u32(info->TMD_File_ID,LE));
+	printf(" CMD Content ID:             %08x\n",u8_to_u32(info->CMD_File_ID,LE));
+	printf(" ExtdataID low:              %08x\n",u8_to_u32(info->ExtData_ID,LE));
 	printf(" Manual:                     %s\n",info->Flags_0[0]? "YES" : "NO");
 	printf(" SD Save Data:               %s\n",info->Flags_1[0]? "YES" : "NO");
 	printf(" Is DSiWare:                 %s\n",info->Flags_2[0]? "YES" : "NO");
@@ -239,7 +225,7 @@ void PrintTitleInfoData(TITLE_INFO_ENTRY_STRUCT *info)
 void GetTitleType(u8 TitleID[8])
 {
 	u8 FlagBool[16];
-	u16 TitleTypeID = u8_to_u16(TitleID+4,LITTLE_ENDIAN);
+	u16 TitleTypeID = u8_to_u16(TitleID+4,LE);
 	resolve_flag_u16(TitleTypeID,FlagBool);
 	
 	int TitlePlatform_FLAG = Invalid;
@@ -334,42 +320,36 @@ print_info:
 	}
 }
 
-void ListDatabase(DATABASE_CONTEXT *ctx)
+void ListDatabase(void)
 {
-	u32 ContentCount = GetValidEntryCount(ctx);
+	u32 ContentCount = GetValidEntryCount();
 	u64 len = sizeof(u64) * ContentCount;
 	u64 TitleID_DB[len];
 	memset(&TitleID_DB,0x0,(sizeof(u64)*ContentCount));
-	CollectTitleIDs(TitleID_DB,ContentCount,ctx);
+	CollectTitleIDs(TitleID_DB,ContentCount);
 	merge_sort(TitleID_DB,ContentCount);
 	ListTitleIDs(TitleID_DB,ContentCount);
 }
 
-u32 GetValidEntryCount(DATABASE_CONTEXT *ctx)
+u32 GetValidEntryCount(void)
 {
 	u32 counter = 0;
-	for(u32 i = 0; i < ctx->database.MaxCount; i++){
-		if(EntryUsed(&ctx->database.TitleData[i]) == Valid && EntryValid(&ctx->database.TitleData[i]) == Valid)
+	for(u32 i = 0; i < db_ctx.database.MaxCount; i++){
+		if(EntryUsed(&db_ctx.database.TitleData[i]) == Valid && EntryValid(&db_ctx.database.TitleData[i]) == Valid)
 			counter++;
 	}
 	return counter;
 }
 
-void CollectTitleIDs(u64 *TitleID_DB, u32 ContentCount, DATABASE_CONTEXT *ctx)
+void CollectTitleIDs(u64 *TitleID_DB, u32 ContentCount)
 {
-	for(u32 i = 0, TID_Count = 0; i < ctx->database.MaxCount || TID_Count < ContentCount; i++){
-		if(EntryUsed(&ctx->database.TitleData[i]) == Valid /*&& EntryValid(&ctx->database.TitleData[i]) == Valid*/){
-			TitleID_DB[TID_Count] = ReturnTitleID(&ctx->database.TitleData[i]);
+	for(u32 i = 0, TID_Count = 0; i < db_ctx.database.MaxCount || TID_Count < ContentCount; i++){
+		if(EntryUsed(&db_ctx.database.TitleData[i]) == Valid){
+			TitleID_DB[TID_Count] = u8_to_u64(db_ctx.database.TitleData[i].index->Title_ID,LE);
 			TID_Count++;
 		}
 	}
 }
-
-u64 ReturnTitleID(TITLE_CONTEXT *TitleData)
-{
-	return u8_to_u64(TitleData->index.Title_ID,LITTLE_ENDIAN);
-}
-
 
 void ListTitleIDs(u64 *TitleID_DB, u32 ContentCount)
 {
@@ -378,47 +358,4 @@ void ListTitleIDs(u64 *TitleID_DB, u32 ContentCount)
 	for(u32 i = 0; i < ContentCount; i++){
 		printf(" %016llx\n",TitleID_DB[i]);
 	}
-}
-
-void print_product_code(u8 *product_code)
-{
-	for(int i = 0; i < 0x10; i++){
-		if(product_code[i] == '\0')
-			return;
-		putchar(product_code[i]);
-	}
-}
-
-// Adapted from http://rosettacode.org/wiki/Sorting_algorithms/Merge_sort#C
-
-void merge(u64 *left, int l_len, u64 *right, int r_len, u64 *out)
-{
-	int i, j, k;
-	for (i = j = k = 0; i < l_len && j < r_len; )
-		out[k++] = left[i] < right[j] ? left[i++] : right[j++];
- 
-	while (i < l_len) out[k++] = left[i++];
-	while (j < r_len) out[k++] = right[j++];
-}
- 
-/* inner recursion of merge sort */
-void recur(u64 *buf, u64 *tmp, int len)
-{
-	int l = len / 2;
-	if (len <= 1) return;
- 
-	/* note that buf and tmp are swapped */
-	recur(tmp, buf, l);
-	recur(tmp + l, buf + l, len - l);
- 
-	merge(tmp, l, tmp + l, len - l, buf);
-}
- 
-/* preparation work before recursion */
-void merge_sort(u64 *buf, int len)
-{
-	u64 *tmp = malloc(sizeof(u64) * len);
-	memcpy(tmp, buf,(sizeof(u64) * len));
-	recur(buf, tmp, len);
-	free(tmp);
 }

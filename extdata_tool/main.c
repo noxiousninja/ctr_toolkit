@@ -10,237 +10,597 @@ the Free Software Foundation, either version 3 of the License, or
 
 extdata_tool is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with extdata_tool.  If not, see <http://www.gnu.org/licenses/>.
+along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "lib.h"
-#include "ExtData.h"
-#include "titledb.h"
+#include "aesmac.h"
+#include "extdata.h"
 #include "vsxe.h"
-#include "main.h"
+#include "titledb.h"
+#include "ctr_crypto.h"
+
 
 //Version
 typedef enum
 {
-	MAJOR = 1,
-	MINOR = 6
+	MAJOR = 2,
+	MINOR = 0
 } app_version;
+
+typedef enum
+{
+	image = 1,
+	fs,
+	generate
+} program_action;
 
 void app_title(void);
 void help(char *app_name);
 
 int main(int argc, char *argv[])
 {
-	app_title();
-	
-	if (argc < 3 || argc > 18){
-		printf("\n[!] Must Specify Arguments\n");
+	if(argc < 2){
 		help(argv[0]);
 		return 1;
 	}
-
-	INPUT_CONTEXT ctx;
-	memset(&ctx,0,sizeof(ctx));
+	int action = 0;
+	int i = 1;
+	while(!action){
+		if(i == argc) break; 
+		if(strcmp(argv[i],"-i") == 0 || strncmp(argv[i],"--image=",8) == 0) action = image;
+		if(strcmp(argv[i],"-d") == 0 || strncmp(argv[i],"--FSdir=",8) == 0) action = fs;
+		if(strcmp(argv[i],"-g") == 0 || strncmp(argv[i],"--genextdata=",13) == 0) action = generate;
+		i++;
+	}	
+	if(action == 0){
+		printf("[!] Nothing to do\n");
+		help(argv[0]);
+		return ARG_ERROR;
+	}
 	
-	for(int i = 1; i < argc - 1; i++){
-		if (strcmp(argv[i], "--mode") == 0 || strcmp(argv[i], "-m") == 0){
-			if(strcmp(argv[i+1],"IMG") == 0)
-				ctx.mode = Image;
-			else if(strcmp(argv[i+1],"FS") == 0)
-				ctx.mode = Directory;
-			else{
-				printf("[!] Unrecognised mode: '%s'\n",argv[i+1]);
-				return 1;
+	if(action == image){
+		ExtdataContext *extdata = malloc(sizeof(ExtdataContext));
+		InitaliseExtdataContext(extdata);
+		char *input = NULL;
+		char *output = NULL;
+		int DB_Mode = -1;
+		u8 Extract = False;
+		extdata->Verbose = False;
+		extdata->OverrideActiveDIFI = False;
+		u8 result = 0;
+		
+		for(i = 1; i < argc; i++){
+			if(strcmp(argv[i],"-i") == 0 && input == NULL && i < argc-1){
+				input = argv[i+1];
+			}
+			else if(strncmp(argv[i],"--image=",8) == 0 && input == NULL){
+				input = (char*)(argv[i]+8);
+			}
+			else if(strcmp(argv[i],"-x") == 0 && output == NULL && i < argc-1 && Extract == False){
+				Extract = True;
+				output = argv[i+1];
+			}
+			else if(strncmp(argv[i],"--extract=",10) == 0 && output == NULL && Extract == False){
+				Extract = True;
+				output = (char*)(argv[i]+10);
+			}
+			else if(strcmp(argv[i],"-a") == 0 && i < argc-1){
+				extdata->OverrideActiveDIFI = True;
+				extdata->DIFIPartition = strtol(argv[i+1],NULL,10);
+			}
+			else if(strncmp(argv[i],"--forcedifi=",12) == 0){
+				extdata->OverrideActiveDIFI = True;
+				extdata->DIFIPartition = strtol((argv[i]+12),NULL,10);
+			}
+			else if(strcmp(argv[i],"-p") == 0 || strcmp(argv[i],"--info") == 0){
+				extdata->Verbose = True;
+			}
+			else if(strcmp(argv[i],"-l") == 0 || strcmp(argv[i],"--listDB") == 0){
+				DB_Mode = DB_Normal;
+			}
+			else if(strcmp(argv[i],"-0") == 0 || strcmp(argv[i],"--listTID") == 0){
+				DB_Mode = DB_ByTID;
 			}
 		}
-	}
-	if(ctx.mode == 0){
-		printf("[!] No mode was specified\n");
-		return 1;
-	}
-	
-	if (getcwdir(ctx.cwd,IO_PATH_LEN) == NULL){
-		printf("[!] Could not store Current Working Directory\n");
-		return IO_FAIL;
-	}
-	
-#ifdef _WIN32
-	ctx.platform = WIN_32;
-#else
-	ctx.platform = UNIX;
-#endif
-
-	ctx.extdataimg_path = malloc(IO_PATH_LEN);
-	ctx.input = malloc(IO_PATH_LEN);
-	memset(ctx.extdataimg_path,0,IO_PATH_LEN);
-	memset(ctx.input,0,IO_PATH_LEN);
-	switch(ctx.mode){
-		case Image:
-			memcpy(ctx.input,argv[argc - 1],strlen(argv[argc - 1]));
-			memcpy(ctx.extdataimg_path,argv[argc - 1],strlen(argv[argc - 1]));
-			break;
-		case Directory:
-			chdir(argv[argc - 1]);
-			getcwdir(ctx.input,IO_PATH_LEN);
-			chdir(ctx.cwd);
-			sprintf(ctx.extdataimg_path,"%s%c00000001.dec",ctx.input,ctx.platform);
-			break;
-	}
-	ctx.extdataimg = fopen(ctx.extdataimg_path,"rb");
-	if(ctx.extdataimg == NULL){
-		printf("[!] Failed to Open '%s'\n",ctx.extdataimg_path);
-		return IO_FAIL;
-	}
-	
-	for(int i = 1; i < argc - 1; i++){
-		if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0){
+		
+		if(input == NULL){
+			printf("[!] No input extdata image was specified\n");
+			FreeExtdataContext(extdata);
 			help(argv[0]);
+			return ARG_ERROR;
+		}
+		if(Extract == False && extdata->Verbose == False && DB_Mode == -1){
+			printf("[!] Nothing to do\n");
+			FreeExtdataContext(extdata);
+			help(argv[0]);
+			return ARG_ERROR;
+		}
+		
+		if(extdata->OverrideActiveDIFI && extdata->DIFIPartition != 0 && extdata->DIFIPartition != 1){
+			printf("[!] Invalid DIFI partition: %d\n",extdata->DIFIPartition);
+			FreeExtdataContext(extdata);
+			help(argv[0]);
+			return ARG_ERROR;
+		}
+		
+		extdata->extdata.size = GetFileSize_u64(input);
+		extdata->extdata.buffer = malloc(extdata->extdata.size);
+		if(extdata->extdata.buffer == NULL){
+			printf("[!] Failed to allocate memory for extdata image\n");
+			FreeExtdataContext(extdata);
+			return MEM_ERROR;
+		}
+		FILE *fp = fopen(input,"rb");
+		if(fp == NULL){
+			printf("Failed to open '%s'\n",input);
+			FreeExtdataContext(extdata);
+			return IO_FAIL;
+		}
+		ReadFile_64(extdata->extdata.buffer,extdata->extdata.size,0,fp);
+		fclose(fp);
+		result = GetExtdataContext(extdata);
+		if(result != 0){
+			printf("Failed to interprete extdata image (%d)\n",result);
+			FreeExtdataContext(extdata);
 			return 1;
 		}
-		else if (strcmp(argv[i], "--info") == 0 || strcmp(argv[i], "-i") == 0){
-			ctx.info = True;
-		}
-		else if (strcmp(argv[i], "--extract") == 0 || strcmp(argv[i], "-x") == 0){
-			ctx.extract = True;
-			ctx.output = malloc(IO_PATH_LEN);
-			memset(ctx.output,0,IO_PATH_LEN); 
-			switch(ctx.mode){
-				case(Image): memcpy(ctx.output,argv[i+1],strlen(argv[i+1])); break;
-				case(Directory):
-					chdir(argv[i+1]);
-					getcwdir(ctx.output,IO_PATH_LEN);
-					chdir(ctx.cwd);
-					break;
+		
+		if(extdata->Files.Count > 0){
+			u8* embedded_data = extdata->extdata.buffer + extdata->Files.Data[0].offset;
+		
+			// Extracting Data
+			if(extdata->Files.Count == 1 && Extract){
+				fp = fopen(output,"wb");
+				if(fp == NULL){
+					printf("[!] Failed to create '%s'\n",output);
+					FreeExtdataContext(extdata);
+					return IO_FAIL;
+				}
+				printf("[+] Writing data to '%s'\n",output);
+				WriteBuffer(embedded_data,extdata->Files.Data[0].size,0,fp);
+				fclose(fp);
+			}
+		
+			// Displaying DB... if possible
+			if(DB_Mode >= 0){
+				if(extdata->ExtdataType == RawIVFC && extdata->Files.Count == 1 && IsTitleDB(embedded_data)){
+					result = ProcessTitleDB(embedded_data,DB_Mode);
+					if(result){
+						printf("[!] Failed to read DB (%d)\n",result);
+					}
+				}
+				else{
+					printf("[!] No valid Title Database in extdata\n"); 
+				}
+			
 			}
 		}
-		else if (strcmp(argv[i], "--viewFS") == 0 || strcmp(argv[i], "-v") == 0){
-			ctx.fs_info = True;
+		else{
+			printf("[!] No data exists embedded in extdata\n"); 
 		}
-		else if (strcmp(argv[i], "--titledb") == 0 || strcmp(argv[i], "-t") == 0){
-			ctx.titledb_read = True;
-		}
-		else if (strcmp(argv[i], "--listdb") == 0 || strcmp(argv[i], "-l") == 0){
-			ctx.listdb = True;
-		}
+		FreeExtdataContext(extdata);
 	}
 	
-	//ctx.extdataimg
-	GetExtDataContext(&ctx.data,ctx.extdataimg);
-	//Performing Functions Now
-	
-	if(ctx.info == True){
-		print_extdata_header(ctx.data.header);
-		print_partition_info(ctx.data.partition[primary]);
-		if(ctx.data.header.DIFF.secondary_partition_offset != 0){
-			print_partition_info(ctx.data.partition[secondary]);
+	else if(action == fs){
+		VSXEContext *vsxe_ctx = malloc(sizeof(VSXEContext));
+		ExtdataContext vsxe;
+		char *input = NULL;
+		char *output = NULL;
+		char cwd[IO_PATH_LEN];
+		char VSXE_image_path[IO_PATH_LEN];
+		memset(vsxe_ctx,0,sizeof(VSXEContext));
+		memset(&cwd,0,IO_PATH_LEN);
+		memset(&VSXE_image_path,0,IO_PATH_LEN);
+		memset(&vsxe,0,sizeof(ExtdataContext));
+		
+		if(getcwdir(cwd,IO_PATH_LEN) == NULL){
+			printf("[!] Could not store Current Working Directory\n");
+			return IO_FAIL;
 		}
-	}
-	
-	if(ctx.titledb_read == True || ctx.listdb == True){
-		if(ctx.mode != Image){
-			printf("[!] Database ExtData images (*.db) do not support being stored in Title ExtData directories\n");
-			return 1;
+		
+		
+		for(i = 1; i < argc; i++){
+			if(strcmp(argv[i],"-d") == 0 && input == NULL && i < argc-1){
+				input = argv[i+1];
+			}
+			else if(strncmp(argv[i],"--FSdir=",8) == 0 && input == NULL){
+				input = (char*)(argv[i]+8);
+			}
+			else if(strcmp(argv[i],"-f") == 0 && output == NULL && i < argc-1){
+				vsxe_ctx->Flags[vsxe_extract] = True;
+				output = argv[i+1];
+			}
+			else if(strncmp(argv[i],"--extractFS=",12) == 0 && output == NULL){
+				vsxe_ctx->Flags[vsxe_extract] = True;
+				output = (char*)(argv[i]+12);
+			}
+			else if(strcmp(argv[i],"-s") == 0 || strcmp(argv[i],"--showFS") == 0){
+				vsxe_ctx->Flags[vsxe_show_fs] = True;
+			}
+			else if(strcmp(argv[i],"-a") == 0 && i < argc-1){
+				vsxe.OverrideActiveDIFI = True;
+				vsxe.DIFIPartition = strtol(argv[i+1],NULL,10);
+			}
+			else if(strncmp(argv[i],"--forcedifi=",12) == 0){
+				vsxe.OverrideActiveDIFI = True;
+				vsxe.DIFIPartition = strtol((argv[i]+12),NULL,10);
+			}
 		}
-		int db_mode = Normal;
-		if(ctx.listdb == True)
-			db_mode = ByTID;
-		if(ProcessTitleDB(ctx.extdataimg, db_mode,(ctx.data.header.DIFF.active_table_offset + ctx.data.partition[primary].IVFC.level_4_fs_relative_offset + ctx.data.partition[primary].DPFS.ivfc_offset)) != 0){
-			if(ctx.data.partition[primary].DIFI.flags[0] == 0x0){
-				if(ProcessTitleDB(ctx.extdataimg, db_mode,(ctx.data.header.DIFF.active_table_offset + ctx.data.partition[primary].DPFS.ivfc_length + ctx.data.partition[secondary].DPFS.ivfc_offset + ctx.data.partition[primary].IVFC.level_4_fs_relative_offset)) != 0){
-					printf("[!] %s is Corrupt, or is not a Title Database ExtData Image\n",ctx.extdataimg_path);
+		
+		if(input == NULL){
+			printf("[!] No Extdata FS directory was specified\n");
+			free(vsxe_ctx);
+			return ARG_ERROR;
+		}
+		
+		if(vsxe_ctx->Flags[vsxe_extract] && output == NULL){
+			printf("[!] No Output directory was specified\n");
+			free(vsxe_ctx);
+			return ARG_ERROR;
+		}
+		
+		if(vsxe_ctx->Flags[vsxe_show_fs] == False && vsxe_ctx->Flags[vsxe_extract] == False){
+			printf("[!] Nothing to do\n");
+			free(vsxe_ctx);
+			return ARG_ERROR;
+		}
+		
+#ifdef _WIN32
+		vsxe_ctx->platform = WIN_32;
+#else
+		vsxe_ctx->platform = UNIX;
+#endif
+		
+		// Storing Input Directory
+		vsxe_ctx->input = malloc(IO_PATH_LEN);
+		if(vsxe_ctx->input == NULL){
+			printf("[!] Failed to allocate memory for input path\n");
+			free(vsxe_ctx);
+			return MEM_ERROR;
+		}
+		chdir(input);
+		if(getcwdir(vsxe_ctx->input,IO_PATH_LEN) == NULL){
+			printf("[!] Could not store input Directory\n");
+			free(vsxe_ctx->input);
+			free(vsxe_ctx);
+			return IO_FAIL;
+		}
+		chdir(cwd);
+		
+		// Storing Output Directory
+		vsxe_ctx->output = malloc(IO_PATH_LEN);
+		if(vsxe_ctx->output == NULL){
+			printf("[!] Failed to allocate memory for output path\n");
+			free(vsxe_ctx->input);
+			free(vsxe_ctx);
+			return MEM_ERROR;
+		}
+		chdir(output);
+		if(getcwdir(vsxe_ctx->output,IO_PATH_LEN) == NULL){
+			printf("[!] Could not store output Directory\n");
+			free(vsxe_ctx->input);
+			free(vsxe_ctx->output);
+			free(vsxe_ctx);
+			return IO_FAIL;
+		}
+		chdir(cwd);
+		
+		// Getting path to VSXE FS Image
+		sprintf(VSXE_image_path,"%s%c00000001.dec",vsxe_ctx->input,vsxe_ctx->platform);
+		
+		FILE *fp = fopen(VSXE_image_path,"rb");
+		if(fp == NULL){
+			printf("[!] Could not open '%s'\n",VSXE_image_path);
+			free(vsxe_ctx->input);
+			free(vsxe_ctx->output);
+			free(vsxe_ctx);
+			return IO_FAIL;
+		}
+		
+		fclose(fp);
+		vsxe.extdata.size = GetFileSize_u64(VSXE_image_path);
+		vsxe.extdata.buffer = malloc(vsxe.extdata.size);
+		if(vsxe.extdata.buffer == NULL){
+			printf("[!] Failed to allocate memory for VSXE FST Image\n");
+			free(vsxe_ctx->input);
+			free(vsxe_ctx->output);
+			free(vsxe_ctx);
+			return MEM_ERROR;
+		}
+		
+		// Getting VSXE FST Image
+		fp = fopen(VSXE_image_path,"rb");
+		ReadFile_64(vsxe.extdata.buffer,vsxe.extdata.size,0,fp);
+		fclose(fp);
+		
+		u8 result = GetExtdataContext(&vsxe);
+		if(result){
+			printf("[!] Failed to obtain VSXE FST from image '%s' (%d)\n",VSXE_image_path,result);
+			free(vsxe_ctx->input);
+			free(vsxe_ctx->output);
+			free(vsxe_ctx);
+			free(vsxe.extdata.buffer);
+			return result;
+		}
+		
+		if(vsxe.Files.Count > 0){
+			u8 *vsxe_offset = vsxe.extdata.buffer + vsxe.Files.Data[0].offset;
+			if(vsxe.ExtdataType == RawIVFC && vsxe.Files.Count == 1 && IsVSXEFileSystem(vsxe_offset)){
+				vsxe_ctx->vsxe = vsxe_offset;
+				result = ProcessExtData_FS(vsxe_ctx);
+				if(result){
+					printf("[!] Failed to read VSXE FST (%d)\n",result);
 				}
 			}
-			else
-				printf("[!] %s is Corrupt, or is not a Title Database ExtData Image\n",ctx.extdataimg_path);
+			else{
+				printf("[!] No valid VSXE FST exists in '%s'\n",output); 
+			}
 		}
+		else{
+			printf("[!] No data exists embedded in extdata\n"); 
+		}
+		free(vsxe_ctx->input);
+		free(vsxe_ctx->output);
+		free(vsxe_ctx);
+		free(vsxe.extdata.buffer);
 	}
 	
-	if(ctx.extract == True && ctx.mode == Image){
-		if(ctx.data.partition[primary].DIFI.flags[0] == 1){//ONE FILE
-			u64 offset = ctx.data.partition[primary].DIFI.data_partition_offset + ctx.data.partition[primary].DPFS.ivfc_offset;
-			u64 size = ctx.data.partition[primary].IVFC.level_4_fs_size;
-			FILE *out = fopen(ctx.output,"wb");
-			if(out == NULL){
-				printf("[!] Could not create output file\n");
-				return IO_ERROR;
+	else if(action == generate){
+		// Extdata Gen
+		COMPONENT_STRUCT sourcedata;
+		memset(&sourcedata,0,sizeof(COMPONENT_STRUCT));
+		COMPONENT_STRUCT outdata;
+		memset(&outdata,0,sizeof(COMPONENT_STRUCT));
+		
+		char *input = NULL;
+		char *output = NULL;
+		char *extdatatype = NULL;
+		u32 activeDIFI = 0;
+		u8 type = 0;
+		u8 UniqueExtdataID[8];
+		memset(&UniqueExtdataID,0,8);
+		
+		u8 GenMAC = False;
+		
+		for(i = 1; i < argc; i++){
+			if(strcmp(argv[i],"-1") == 0 || strcmp(argv[i],"-2") == 0 || strncmp(argv[i],"--keyX=",6) == 0 || strncmp(argv[i],"--keyY=",6) == 0){
+				GenMAC = True;
 			}
-			if(ExportFileToFile(ctx.extdataimg,out,size,offset,0) != 0){
-				printf("[!] Failed to Extract ExtData\n");
-				fclose(out);
-				return Fail;
+			else if(strcmp(argv[i],"-g") == 0 && input == NULL && i < argc-1){
+				input = argv[i+1];
 			}
-			fclose(out);
+			else if(strncmp(argv[i],"--genextdata=",13) == 0 && input == NULL){
+				input = (char*)(argv[i]+13);
+			}
+			else if(strcmp(argv[i],"-o") == 0 && output == NULL && i < argc-1){
+				output = argv[i+1];
+			}
+			else if(strncmp(argv[i],"--outimage=",11) == 0 && output == NULL){
+				output = (char*)(argv[i]+11);
+			}
+			else if(strcmp(argv[i],"-t") == 0 && extdatatype == NULL && i < argc-1){
+				extdatatype = argv[i+1];
+			}
+			else if(strncmp(argv[i],"--type=",7) == 0 && extdatatype == NULL){
+				extdatatype = (char*)(argv[i]+7);
+			}
+			else if(strcmp(argv[i],"-a") == 0 && i < argc-1){
+				activeDIFI = strtol(argv[i+1],NULL,10);
+			}
+			else if(strncmp(argv[i],"--activedifi=",13) == 0){
+				activeDIFI = strtol((argv[i]+13),NULL,10);
+			}
+			else if(strcmp(argv[i],"-u") == 0 && i < argc-1){
+				if(strlen(argv[i+1]) == 16)
+					char_to_int_array(UniqueExtdataID,argv[i+1],8,BE,16);
+				else
+					printf("[!] Invalid length for Extdata Unique ID (expected 16 hex characters)\n"); 
+			}
+			else if(strncmp(argv[i],"--uniqueID=",11) == 0){
+				if(strlen((argv[i]+11)) == 16)
+					char_to_int_array(UniqueExtdataID,(argv[i]+11),8,BE,16);
+				else
+					printf("[!] Invalid length for Extdata Unique ID (expected 16 hex characters)\n"); 
+			}
 		}
-		else if(ctx.data.partition[primary].DIFI.flags[0] == 0){//TWO Versions of ONE FILE
-			char out_name[IO_PATH_LEN];
-			u64 offset[2];
-			u64 size[2];
-			memset(&offset,0x0,sizeof(offset));
-			memset(&size,0x0,sizeof(size));
-			//File 0 Details
-			offset[0] = ctx.data.header.DIFF.active_table_offset + ctx.data.partition[primary].IVFC.level_4_fs_relative_offset + ctx.data.partition[primary].DPFS.ivfc_offset;
-			size[0] = ctx.data.partition[primary].IVFC.level_4_fs_size;
-			//File 1 Details
-			offset[1] = ctx.data.header.DIFF.active_table_offset + ctx.data.partition[primary].DPFS.ivfc_length + ctx.data.partition[secondary].DPFS.ivfc_offset + ctx.data.partition[primary].IVFC.level_4_fs_relative_offset;
-			size[1] = ctx.data.partition[secondary].IVFC.level_4_fs_size;
-			for(int i = 0; i < 2; i++){
-				memset(&out_name,0,IO_PATH_LEN);
-				sprintf(out_name, "%d_%s",i,ctx.output);
-				FILE *out = fopen(out_name,"wb");
-				if(out == NULL){
-					printf("[!] Could not create output file\n");
-					return IO_ERROR;
+		
+		if(input == NULL){
+			printf("[!] No input image was specified\n");
+			help(argv[0]);
+			return ARG_ERROR;
+		}
+		
+		if(output == NULL){
+			printf("[!] No output extdata image was specified\n");
+			help(argv[0]);
+			return ARG_ERROR;
+		}
+		
+		if(extdatatype == NULL){
+			printf("[!] No extdata type was specified\n");
+			help(argv[0]);
+			return ARG_ERROR;
+		}
+		
+		// MAC Gen
+		AESMAC_CTX *aes_ctx = malloc(sizeof(AESMAC_CTX));
+		memset(aes_ctx,0,sizeof(AESMAC_CTX));
+		u8 KeyX[0x10];
+		u8 KeyY[0x10];
+		memset(&KeyX,0,0x10);
+		memset(&KeyY,0,0x10);
+		
+		if(strcmp(extdatatype,"DATA") == 0){
+			type = BUILD_DATA;
+			aes_ctx->type = mac_extdata;	
+		}
+		else if(strcmp(extdatatype,"FS") == 0){
+			type = BUILD_FS;
+			aes_ctx->type = mac_extdata;	
+		}
+		else if(strcmp(extdatatype,"TDB") == 0){
+			type = BUILD_DB;
+			aes_ctx->type = mac_title_db;	
+		}
+		else if(strcmp(extdatatype,"IDB") == 0){
+			type = BUILD_DB;
+			aes_ctx->type = mac_import_db;	
+		}
+			
+		if(type == 0){
+			printf("[!] Invalid Extdata type '%s'\n",extdatatype);
+			help(argv[0]);
+			free(aes_ctx);
+			return ARG_ERROR;
+		}
+			
+		if(GenMAC){
+			for(i = 1; i < argc; i++){
+				if(strcmp(argv[i],"-1") == 0 && i < argc-1){
+					if(strlen(argv[i+1]) == 32)
+						char_to_int_array(KeyX,argv[i+1],16,BE,16);
+					else{
+						printf("[!] Invalid length for KeyX (expected 32 hex characters)\n"); 
+						help(argv[0]);
+						free(aes_ctx);
+						return ARG_ERROR;
+					}
 				}
-				if(ExportFileToFile(ctx.extdataimg,out,size[i],offset[i],0) != 0){
-					printf("[!] Failed to Extract ExtData\n");
-					fclose(out);
-					return Fail;
+				else if(strncmp(argv[i],"--keyX=",7) == 0){
+					if(strlen((argv[i]+7)) == 32)
+						char_to_int_array(KeyX,(argv[i]+7),16,BE,16);
+					else{
+						printf("[!] Invalid length for KeyX (expected 32 hex characters)\n"); 
+						help(argv[0]);
+						free(aes_ctx);
+						return ARG_ERROR;
+					}
 				}
-				fclose(out);
+				else if(strcmp(argv[i],"-2") == 0 && i < argc-1){
+					if(strlen(argv[i+1]) == 32)
+						char_to_int_array(KeyY,argv[i+1],16,BE,16);
+					else{
+						printf("[!] Invalid length for KeyY (expected 32 hex characters)\n"); 
+						help(argv[0]);
+						free(aes_ctx);
+						return ARG_ERROR;
+					}
+				}
+				else if(strncmp(argv[i],"--keyY=",7) == 0){
+					if(strlen((argv[i]+7)) == 32)
+						char_to_int_array(KeyY,(argv[i]+7),16,BE,16);
+					else{
+						printf("[!] Invalid length for KeyY (expected 32 hex characters)\n"); 
+						help(argv[0]);
+						free(aes_ctx);
+						return ARG_ERROR;
+					}
+				}
+				else if(strcmp(argv[i],"-3") == 0 && i < argc-1){
+					u32_to_u8(aes_ctx->subdir_id,strtol(argv[i+1],NULL,16),BE);
+				}
+				else if(strncmp(argv[i],"--SubDirID=",11) == 0){
+					u32_to_u8(aes_ctx->subdir_id,strtol((argv[i]+11),NULL,16),BE);
+				}
+				else if(strcmp(argv[i],"-4") == 0 && i < argc-1){
+					u32_to_u8(aes_ctx->image_id,strtol(argv[i+1],NULL,16),BE);				
+				}
+				else if(strncmp(argv[i],"--ImageID=",10) == 0){
+					u32_to_u8(aes_ctx->image_id,strtol((argv[i]+11),NULL,16),BE);
+				}
+				else if(strcmp(argv[i],"-4") == 0 || strcmp(argv[i],"-4") == 0){
+					aes_ctx->is_quote_dat = True;
+				}
+			}
+			if(aes_ctx->is_quote_dat){
+				memset(aes_ctx->image_id,0,4);
+				memset(aes_ctx->subdir_id,0,4);
 			}
 		}
-	}
 	
-	if((ctx.extract == True || ctx.fs_info == True) && ctx.mode == Directory){
-		if(ProcessExtData_FS(&ctx) != 0){
-			printf("[!] ExtData FileSystem could not be processed\n");
-			return 1;
+		//Extdata creation
+		FILE *outfile = fopen(output,"wb");
+		if(outfile == NULL){
+			printf("[!] Failed to create '%s'\n",output);
+			free(aes_ctx);
+			return IO_FAIL;
 		}
+		sourcedata.size = GetFileSize_u64(input);
+		sourcedata.buffer = malloc(sourcedata.size);
+		if(sourcedata.buffer == NULL){
+			printf("[!] Failed to allocate memory to generate Extdata\n");
+			free(aes_ctx);
+			return MEM_ERROR;
+		}
+		FILE *infile = fopen(input,"rb");
+		if(infile == NULL){
+			printf("[!] Failed to open '%s'\n",input);
+			free(aes_ctx);
+			free(sourcedata.buffer);
+			return IO_FAIL;
+		}
+		ReadFile_64(sourcedata.buffer,sourcedata.size,0,infile);
+		fclose(infile);
+		
+		u8 result = CreateExtdata(&outdata,&sourcedata,type,activeDIFI,UniqueExtdataID);
+		if(result){
+			free(sourcedata.buffer);
+			if(outdata.size > 0){ free(outdata.buffer); }
+			return result;
+		}
+		if(GenMAC){
+			printf("[+] Generating AES MAC\n");
+			memcpy(aes_ctx->header,(outdata.buffer+0x100),0x100);
+			GenAESMAC(KeyX,KeyY,aes_ctx);
+			memcpy(outdata.buffer,aes_ctx->aesmac,16);
+		}
+		printf("[+] Writing '%s'\n",output);
+		WriteBuffer(outdata.buffer,outdata.size,0,outfile);
+		free(outdata.buffer);
+		free(sourcedata.buffer);
+		fclose(outfile);
 	}
-	
-	
-	free(ctx.input);
-	if(ctx.extract == True){
-		free(ctx.output);
-	}
-	free(ctx.extdataimg_path);
-	fclose(ctx.extdataimg);
-	printf("[*] Done\n");
 	return 0;
 }
 
 void app_title(void)
 {
-	printf("CTR_Toolkit - ExtData Tool\n");
+	printf("CTR_Toolkit - Extra Data Tool\n");
 	printf("Version %d.%d (C) 3DSGuy 2013\n",MAJOR,MINOR);
 }
 
 void help(char *app_name)
 {
-	printf("\nUsage: %s [options] <extdata image/directory>\n", app_name);
+	app_title();
+	printf("Usage: %s [options]\n", app_name);
 	putchar('\n');
 	printf("OPTIONS                 Possible Values       Explanation\n");
+	printf(" -i, --image=           File-in               Specify input Extdata\n");
+	printf(" -x, --extract=         File-out              Extract data from image\n");
+	printf(" -a, --forcedifi=       '0'/'1'               Force reading Primary (0) or Secondary (1) DIFI\n");
+	printf(" -p, --info                                   Print info\n");
 	//printf(" -v, --verbose                                Enable verbose output.\n");
-	printf(" -m, --mode             IMG/FS                Specify mode, Single Image or ExtData FS\n");
-	printf(" -h, --help                                   Print this help.\n");
-  	printf(" -i, --info                                   Display ExtData Info.\n");
-	printf(" -x, --extract          Out-dir/Out-file      Extract Data from an ExtData Image or FS.\n");
-	printf("ExtData FS Options:\n");
-	printf(" -v, --viewFS                                 Display ExtData FS.\n");
-	printf("Database ExtData Options:\n");
-	printf(" -t, --titledb                                Display Data in Title Database\n");
-	printf(" -l, --listdb                                 Generate a Title List from TDB(use with '-t' option)\n");
+	printf("Extdata (VSXE) File System Options:\n");
+	printf(" -d, --FSdir=           Dir-in                Specify Extdata FS Directory\n");
+	printf(" -s, --showFS                                 Display VSXE Extdata Mount Points\n");
+	printf(" -f, --extractFS=       Dir-out               Extract VSXE File System\n");
+	printf("Extdata Title Database (BDRI) Options:\n");
+	printf(" -l, --listDB                                 List the Titles in DB\n");
+	printf(" -0, --listTID                                List the Title IDs of the titles in DB\n");
+	printf("Extdata Creation Options:\n");
+	printf(" -g, --genextdata=      File-in               Create an extdata image for a given image\n");
+	printf(" -o, --outimage=        File-out              Output Extdata image\n");
+	printf(" -t, --type=            DATA/FS/TDB/IDB       Specify Extdata Type\n");  
+	printf(" -u, --uniqueID=        Value                 Specify Extdata Unique ID (16 hex characters)\n");
+	printf(" -a, --activedifi=      '0'/'1'               Specify Active DIFI Partition\n");
+	printf("AES MAC Options:\n");
+	printf(" -1, --keyX=            Value                 Specify KeyX for MAC (32 hex characters)\n");
+	printf(" -2, --keyY=            Value                 Specify KeyY for MAC (32 hex characters)\n");
+	printf(" -3, --SubDirID=        Value                 Specify Extdata Sub directory ID (8 hex characters)\n");
+	printf(" -4, --ImageID=         Value                 Specify Extdata Image ID (8 hex characters)\n");
+	printf(" -5, --IsQuoteDat                             Specify if extdata will be Quote.dat?\n");
 }

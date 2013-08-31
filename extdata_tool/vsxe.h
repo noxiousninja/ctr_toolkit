@@ -10,18 +10,35 @@ the Free Software Foundation, either version 3 of the License, or
 
 extdata_tool is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with extdata_tool.  If not, see <http://www.gnu.org/licenses/>.
-**/
-typedef enum
+along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
+**/typedef enum
 {
 	vsxe_magic = 0x56535845,
 	vsxe_magic_id = 0x30000
 } VSXE_data;
 
+typedef enum
+{
+	VSXE_BAD_EXTDATA_TYPE = 20,
+	VSXE_UNEXPECTED_DATA_IN_EXTDATA,
+	VSXE_MEM_FAIL,
+} VSXE_errors;
+
+typedef enum
+{
+	vsxe_extract = 0,
+	vsxe_show_fs,
+} VSXE_OptionIndex;
+
+typedef enum
+{
+	vsxe_fs_deleted = 0,
+	vsxe_fs_modified = 2,
+} vsxe_fs_file_action;
 
 //Structs
 typedef struct
@@ -42,27 +59,31 @@ typedef struct
     u8 unk0[4];
     u8 unk1[4]; // magic?
     u8 unk2[4];
-    u8 unk3[8];
+    u8 unique_extdata_id[8];
     u8 unk4[4]; // flags?
     u8 unk5[4];
 } file_entry;
 
 typedef struct
 {
-	u8 unk0[40][4];
-} data_table;
+	//u8 unk0[40][4];
+	u8 unk0[0x38];
+	u8 folder_table_offset[8];
+} vsxe_data_table;
 
 typedef struct
 {
 	u8 magic[4];
 	u8 magic_id[4];
-	u8 data_table_offset[4];
-	u8 unk0[4];
-	u8 unk1[0x20];
-	u8 last_used_file_extdata_id[4];
+	u8 data_table_offset[8];
+	u8 filesizeX[8];
+	u8 filesizeY[8];
+	u8 unk1[0x8];
+	u8 last_used_file_action[4];
 	u8 unk2[4];
+	u8 last_used_file_extdata_id[4];
+	u8 unk3[4];
 	char last_used_file[0x100];
-	data_table table;
 } vsxe_header;
 
 typedef struct
@@ -82,31 +103,42 @@ typedef struct
 
 typedef struct
 {
-	FILE *extdata;
-	u32 offset;
+	u8 *vsxe;
 	
-	vsxe_header header;
+	// File I/O Paths
+	char *input;
+	char *output;
+	char platform;
 	
-	u32 folder_table_offset;
+	// Header
+	vsxe_header *header;
+	vsxe_data_table *data_table;
+	
+	// Folders
+	u64 folder_table_offset;
 	u8 foldercount;
 	folder_entry *folders;
 	
-	u32 file_table_offset;
+	// Files
+	u64 file_table_offset;
 	u8 filecount;
 	file_entry *files;
-} VSXE_CONTEXT;
+} VSXE_INTERNAL_CONTEXT;
+
+typedef struct
+{
+	u8 *vsxe;
+	
+	u8 Flags[2];
+	
+	char *input;
+	char *output;
+	
+	char platform;
+} VSXEContext;
 
 // Prototypes
-int ProcessExtData_FS(INPUT_CONTEXT *ctx);
-int GetVSXEContext(VSXE_CONTEXT *vsxe, INPUT_CONTEXT *ctx);
-void PrintVSXE_FS_INFO(VSXE_CONTEXT *ctx);
-void SetupOutputFS(VSXE_CONTEXT *vsxe, INPUT_CONTEXT *ctx);
-int WriteExtDataFiles(VSXE_CONTEXT *vsxe, INPUT_CONTEXT *ctx);
-int ExportExdataImagetoFile(FILE *extdata, FILE *outfile);
-int VerifyVSXE(VSXE_CONTEXT *ctx);
-void Return_Dir_Path(VSXE_CONTEXT *ctx, u32 file_id, char *path, u8 platform);
-void Return_ExtData_Mount_Path(VSXE_CONTEXT *ctx, u32 file_id, char *path, u8 platform);
-void InterpreteFolderTable(VSXE_CONTEXT *ctx);
-void InterpreteFileTable(VSXE_CONTEXT *ctx);
+int ProcessExtData_FS(VSXEContext *ctx);
+int IsVSXEFileSystem(u8 *vsxe);
 
 //void read_vsxe(FILE *file, u32 offset);

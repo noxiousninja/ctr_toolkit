@@ -1,20 +1,20 @@
 /**
 Copyright 2013 3DSGuy
 
-This file is part of make_cia.
+This file is part of extdata_tool.
 
-make_cia is free software: you can redistribute it and/or modify
+extdata_tool is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
 
-make_cia is distributed in the hope that it will be useful,
+extdata_tool is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
+along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "lib.h"
 
@@ -75,9 +75,9 @@ void u8_hex_print_le(u8 *array, int len)
 		printf("%02x",array[len - i - 1]);
 }
 
-u32 align_value(u32 value, u32 alignment)
+u64 align_value(u64 value, u64 alignment)
 {
-	u32 tmp = value;
+	u64 tmp = value;
 	while(tmp > alignment)
 		tmp -= alignment;
 	return (value + (alignment - tmp));
@@ -137,7 +137,7 @@ int ExportFileToFile(FILE *in, FILE *out, u64 size, u64 in_offset, u64 out_offse
 {
 	u8 *buffer = malloc(size);
 	if(buffer == NULL)
-		return IO_ERROR;
+		return IO_FAIL;
 	ReadFile_64(buffer,size,in_offset,in);
 	WriteBuffer(buffer,size,out_offset,out);
 	return 0;
@@ -149,10 +149,10 @@ void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output)
 	fwrite(buffer,size,1,output);
 } 
 
-void ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
+int ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
 {
 	fseek_64(file,offset,SEEK_SET);
-	fread(outbuff,size,1,file);
+	return fread(outbuff,size,1,file);
 }
 
 u64 GetFileSize_u64(char *filename)
@@ -215,7 +215,7 @@ int fseek_64(FILE *fp, u64 file_pos, int whence)
 {
 #ifdef _WIN32
 	if(whence != SEEK_SET)
-		printf("[!] fseek_64, whence has been overided to SEEK_SET\n");
+		printf("[!] fseek_64, whence has been overridden to SEEK_SET\n");
 	fpos_t pos = file_pos;
 	return fsetpos(fp,&pos); //I can't believe the 2gb problem with Windows & MINGW, maybe I have a bad installation :/
 #else
@@ -389,4 +389,37 @@ void memdump(FILE* fout, const char* prefix, const u8* data, u32 size)
 	}
 }
 
+// Adapted from http://rosettacode.org/wiki/Sorting_algorithms/Merge_sort#C
+
+void merge(u64 *left, int l_len, u64 *right, int r_len, u64 *out)
+{
+	int i, j, k;
+	for (i = j = k = 0; i < l_len && j < r_len; )
+		out[k++] = left[i] < right[j] ? left[i++] : right[j++];
+ 
+	while (i < l_len) out[k++] = left[i++];
+	while (j < r_len) out[k++] = right[j++];
+}
+ 
+/* inner recursion of merge sort */
+void recur(u64 *buf, u64 *tmp, int len)
+{
+	int l = len / 2;
+	if (len <= 1) return;
+ 
+	/* note that buf and tmp are swapped */
+	recur(tmp, buf, l);
+	recur(tmp + l, buf + l, len - l);
+ 
+	merge(tmp, l, tmp + l, len - l, buf);
+}
+ 
+/* preparation work before recursion */
+void merge_sort(u64 *buf, int len)
+{
+	u64 *tmp = malloc(sizeof(u64) * len);
+	memcpy(tmp, buf,(sizeof(u64) * len));
+	recur(buf, tmp, len);
+	free(tmp);
+}
 

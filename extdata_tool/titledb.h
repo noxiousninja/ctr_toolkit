@@ -19,8 +19,8 @@ along with extdata_tool.  If not, see <http://www.gnu.org/licenses/>.
 
 typedef enum
 {
-	Normal,
-	ByTID
+	DB_Normal,
+	DB_ByTID
 }DB_READ_MODES;
 
 typedef enum
@@ -74,8 +74,7 @@ typedef struct
 	u8 unknown_5[4];
 	u8 unknown_6[4];
 	u8 unknown_7[4];
-} __attribute__((__packed__)) 
-TITLE_INDEX_ENTRY_STRUCT;
+} TITLE_INDEX_ENTRY_STRUCT;
 
 typedef struct
 {
@@ -90,18 +89,17 @@ typedef struct
 	u8 ExtData_ID[4];
 	u8 reserved_1[4];
 	u8 Flags_2[8];
-	u8 Product_Code[0x10];
+	char Product_Code[0x10];
 	u8 reserved_2[0x10];
 	u8 unknown_6[4];
 	u8 reserved_3[0xC];
 	u8 reserved_4[0x20];//perhaps padding between info entries
-} __attribute__((__packed__)) 
-TITLE_INFO_ENTRY_STRUCT;
+} TITLE_INFO_ENTRY_STRUCT;
 
 typedef struct
 {
-	TITLE_INDEX_ENTRY_STRUCT index;
-	TITLE_INFO_ENTRY_STRUCT info;
+	TITLE_INDEX_ENTRY_STRUCT *index;
+	TITLE_INFO_ENTRY_STRUCT *info;
 }TITLE_CONTEXT;
 
 typedef struct
@@ -114,8 +112,7 @@ typedef struct
 	u8 max_entry_count[4];
 	u8 unknown_0[4];
 	u8 reserved_2[0x20];
-} __attribute__((__packed__)) 
-ENTRY_TABLE_HEADER;
+} ENTRY_TABLE_HEADER;
 
 /**
 typedef struct
@@ -172,8 +169,7 @@ typedef struct
 	u8 Info_Table_Offset[4];
 	u8 Unknown_2[4];
 	u8 Info_Table_Offset_Medias[4];
-	} __attribute__((__packed__)) 
-BDRI_STRUCT;
+} BDRI_STRUCT;
 
 typedef struct
 {
@@ -186,48 +182,23 @@ typedef struct
 typedef struct
 {
 	int db_type;
-	u64 db_offset;
 	u64 EntryTableOffset;
 }CORE_DB_DATA;
 
 typedef struct
 {
-	FILE *db;
+	u8 *db;
 	CORE_DB_DATA core_data;
 	//
-	BDRI_STRUCT header;
-	ENTRY_TABLE_HEADER entry_table_header;
+	BDRI_STRUCT *header;
+	ENTRY_TABLE_HEADER *entry_table_header;
 	//
 	TITLE_DATABASE database;
 }DATABASE_CONTEXT;
 
-void merge(u64 *left, int l_len, u64 *right, int r_len, u64 *out);
-void recur(u64 *buf, u64 *tmp, int len);
-void merge_sort(u64 *buf, int len);
+int ProcessTitleDB(u8 *db, int Mode);
+int IsTitleDB(u8 *db);
 
-int ProcessTitleDB(FILE *tdb, int Mode, u64 offset);
-
-int GetDB_Header(DATABASE_CONTEXT *ctx);
-void GetDB_Type(DATABASE_CONTEXT *ctx, char db_type_magic[8]);
-int CheckDB_Header(DATABASE_CONTEXT *ctx);
-void ProcessDB_Header(DATABASE_CONTEXT *ctx);
-int GetEntry_Header(DATABASE_CONTEXT *ctx);
-void PopulateDatabase(DATABASE_CONTEXT *ctx);
-void StoreTitleEntry(TITLE_CONTEXT *TitleData, u32 entry_offset,u32 info_offset, FILE *db);
-void PrintDatabase(DATABASE_CONTEXT *ctx);
-void PrintTitleData(TITLE_CONTEXT *TitleData);
-int EntryUsed(TITLE_CONTEXT *TitleData);
-int EntryValid(TITLE_CONTEXT *TitleData);
-void PrintTitleIndexData(TITLE_INDEX_ENTRY_STRUCT *index);
-void PrintTitleInfoData(TITLE_INFO_ENTRY_STRUCT *info);
-void GetTitleType(u8 TitleID[8]);
-void ListDatabase(DATABASE_CONTEXT *ctx);
-u32 GetValidEntryCount(DATABASE_CONTEXT *ctx);
-void CollectTitleIDs(u64 *TitleID_DB, u32 ContentCount, DATABASE_CONTEXT *ctx);
-u64 ReturnTitleID(TITLE_CONTEXT *TitleData);
-void SortTitleIDs(u64 *TitleID_DB, u32 ContentCount);
-void ListTitleIDs(u64 *TitleID_DB, u32 ContentCount);
-void print_product_code(u8 *product_code);
 /**
 DB_HEADER_CONTEXT process_db_header(FILE *tdb, u64 offset);
 void print_db_header(TEMPTDB_STRUCT tdb_header, u8 database_type);
