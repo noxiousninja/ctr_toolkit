@@ -91,6 +91,7 @@ typedef struct
 	// Input
 	u8 header[0x100]; // DISA/DIFF header
 	u8 type;
+	u8 Verbose;
 	
 	//ExtData ONLY Input
 	u8 image_id[4];

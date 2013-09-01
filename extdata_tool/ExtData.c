@@ -42,7 +42,8 @@ int GetExtdataContext(ExtdataContext *ctx)
 	memset(&ext_ctx,0,sizeof(ExtdataWorkingCTX));
 	ext_ctx.extdata = ctx->extdata.buffer;
 	ext_ctx.Size = ctx->extdata.size;
-	
+	ext_ctx.Verbose = ctx->Verbose;	
+
 	//Getting Data from DIFF
 	DIFF_STRUCT *diff = (DIFF_STRUCT*)(ext_ctx.extdata+0x100);
 	if(u8_to_u32(diff->magic_0,BE) != DIFF_MAGIC_0 || u8_to_u32(diff->magic_1,BE) != DIFF_MAGIC_1){
@@ -57,6 +58,10 @@ int GetExtdataContext(ExtdataContext *ctx)
 	ext_ctx.FileBaseSize = u8_to_u64(diff->file_base_size,LE);
 	
 	if(memcmp(ctx->VSXE_Extdata_ID,diff->extdata_unique_id,0x8) == Good) ctx->VSXE_Extdata_ID_Match = True;
+	if(ext_ctx.Verbose) {
+		memdump(stdout,"[+] Actual Extdata Unique ID:   ",diff->extdata_unique_id,8);
+		memdump(stdout,"[+] Expected Extdata Unique ID: ",ctx->VSXE_Extdata_ID,8);
+	}
 	
 	// Getting Data from Active DIFI
 	u8 ActualActivePartitionHash[0x20];
@@ -115,29 +120,23 @@ int GetExtdataContext(ExtdataContext *ctx)
 	// Setting Trust Chain in input context
 	ctx->TrustChain = hashtable.TrustChain;
 	
-	if(ctx->Verbose){
-		//printf("Chain of Trust: 
-		memdump(stdout,"AES MAC:                      ",ext_ctx.extdata,0x10);
-		//if(hashtable.TrustChain){
-		//	printf("Chain of Trust:               Broken\n");
-		//}
-		//else
-		//	printf("Chain of Trust:               Good\n");
+	if(ctx->PrintInfo){
+		memdump(stdout,"AES MAC:                  ",ext_ctx.extdata,0x10);
 		printf("DIFF Header\n");
 		printf(" > Active DIFI Data:\n");   
 		switch(ext_ctx.ActivePartition){
-			case Primary: printf("    Partition:                Primary\n"); break;
-			case Secondary: printf("    Partition:                Secondary\n"); break;
+			case Primary: printf("    Partition:            Primary\n"); break;
+			case Secondary: printf("    Partition:            Secondary\n"); break;
 		}
 		switch(hashtable.ActivePartitionValid){
-			case Good: memdump(stdout,"    Hash (GOOD):              ",diff->active_partition_hash,0x20); break;
-			case Fail: memdump(stdout,"    Hash (FAIL):              ",diff->active_partition_hash,0x20); break;
+			case Good: memdump(stdout,"    Hash (GOOD):          ",diff->active_partition_hash,0x20); break;
+			case Fail: memdump(stdout,"    Hash (FAIL):          ",diff->active_partition_hash,0x20); break;
 		}
-		printf(" > File Base Offset:          0x%llx\n",ext_ctx.FileBaseOffset);
-		printf(" > File Base Size:            0x%llx\n",ext_ctx.FileBaseSize);
-		memdump(stdout," > VSXE Extdata ID:           ",diff->extdata_unique_id,0x8);
+		printf(" > File Base Offset:      0x%llx\n",ext_ctx.FileBaseOffset);
+		printf(" > File Base Size:        0x%llx\n",ext_ctx.FileBaseSize);
+		memdump(stdout," > VSXE Extdata ID:       ",diff->extdata_unique_id,0x8);
 		printf("DIFI Partition Table\n");
-		if(ext_ctx.IsDATA) printf(" > DATA Offset:    0x%llx\n",ext_ctx.DataOffset);
+		if(ext_ctx.IsDATA) printf(" > DATA Offset:    0x%llx\n",ext_ctx.DataOffset+ext_ctx.FileBaseSize);
 		
 		printf(" > IVFC\n");
 		for(int i = 0; i < 4; i++){
@@ -167,7 +166,7 @@ int GetExtdataContext(ExtdataContext *ctx)
 int VerifyIVFCLevels(void)
 {
 	for(int i = 0; i < 4; i++){
-		//printf("Checking Level %d\n",i+1);
+		if(ext_ctx.Verbose)printf("Checking Level %d\n",i+1);
 		// Getting Previous IVFC level data		
 		u64 prev_offset = ext_ctx.IVFC_Master_Hash_Blob_Offset;
 		u64 prev_size = ext_ctx.IVFC_Master_Hash_Blob_Size;
@@ -185,9 +184,9 @@ int VerifyIVFCLevels(void)
 		
 		if(i == level4 && ext_ctx.IsDATA) offset = ext_ctx.DataOffset;
 		
-		// The number of blocks in the current level must match the number of hashes in the previous level (except level 1)
+		// The number of blocks in the current level must match the number of hashes in the previous level
 		if(hashcount != blocknum){ 
-			printf("[!]Unexpected difference in hashcount (%d) and block num (%d) for level (%d)\n",hashcount,blocknum,i+1);
+			printf("[!] Unexpected difference in hashcount (%d) and block num (%d) for level (%d)\n",hashcount,blocknum,i+1);
 			return Fail;
 		}
 		
@@ -200,7 +199,7 @@ int VerifyIVFCLevels(void)
 				
 		// Checking each block in current IVFC level
 		for(int j = 0; j < blocknum; j++){
-			//printf("  Checking Block %d\n",j);
+			if(ext_ctx.Verbose) printf("  Checking Block %d\n",j);
 						
 			u8 *ExpectedHash = ext_ctx.extdata + prev_offset + (j*0x20);
 			u8 *DataToHash = ext_ctx.extdata + offset + (j*blocksize);
@@ -220,10 +219,10 @@ int VerifyIVFCLevels(void)
 			
 			// Storing result
 			hashtable.IVFC_Level_Validity[i] += memcmp(ActualHash,ExpectedHash,0x20);
-			//if(CompareHashPair(HashSlot)){
-				//memdump(stdout,"  Expected Hash:   ",HashSlot[ExpectedHash],0x20);
-				//memdump(stdout,"  Actual Hash:     ",HashSlot[ActualHash],0x20);
-			//}
+			if(ext_ctx.Verbose){
+				memdump(stdout,"  Expected Hash:   ",ExpectedHash,0x20);
+				memdump(stdout,"  Actual Hash:     ",ActualHash,0x20);
+			}
 			//else{
 			//	printf("  Good\n");
 			//}
@@ -391,7 +390,7 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 			ctx->IVFC_MASTER_HASH.buffer = malloc(ctx->IVFC_MASTER_HASH.size);
 		}
 		
-		// The number of blocks in the current level must match the number of hashes in the previous level (except level 1)
+		// The number of blocks in the current level must match the number of hashes in the previous level
 		if(hashcount != blocknum && i > level1){ 
 			printf("[!] Unexpected difference in hashcount (%d) and block num (%d) for level (%d)\n",hashcount,blocknum,i+1);
 			//return Fail;
@@ -449,6 +448,7 @@ int GenerateDIFIPartitions(CreateExtdataCTX *ctx, u8 *outbuff)
 		memcpy(outbuff+ctx->PARTITION_OFFSET[i],&partition[i],sizeof(DIFI_PARTITION));
 		memcpy(outbuff+ctx->PARTITION_OFFSET[i]+sizeof(DIFI_PARTITION),ctx->IVFC_MASTER_HASH.buffer,ctx->IVFC_MASTER_HASH.size);
 	}
+	free(ctx->IVFC_MASTER_HASH.buffer);
 	ctr_sha_256(outbuff+ctx->PARTITION_OFFSET[ctx->ActiveDIFI],ctx->PARTITION_SIZE,ctx->ActiveDIFIHash);
 	
 	return 0;

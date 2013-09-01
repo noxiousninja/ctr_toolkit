@@ -34,7 +34,7 @@ COMPONENT_STRUCT;
 #endif
 
 //MISC
-void char_to_int_array(unsigned char destination[], char source[], int size, int endianness, int base);
+void char_to_u8_array(unsigned char destination[], char source[], int size, int endianness, int base);
 void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness);
 void u8_hex_print_be(u8 *array, int len);
 void u8_hex_print_le(u8 *array, int len);

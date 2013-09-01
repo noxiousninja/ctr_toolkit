@@ -24,6 +24,16 @@ void ctr_keyscrambler(u8 *normalkey, u8 KeyX[16], u8 KeyY[16])
 {
 	//When it's cracked, it'll be implemented
 	//This is just a placeholder keyscrambler for testing.
+	u8 Source[0x20];
+	memcpy(Source,KeyX,16);
+	memcpy(Source+16,KeyY,16);
+	u8 Hash[0x20];
+	ctr_sha_256(Source,0x20,Hash);
+	u8 _KeyX[16];
+	u8 _KeyY[16];
+	memcpy(_KeyX,Hash,16);
+	memcpy(_KeyY,Hash+16,16);
+
 	for(int i = 0,count = 15; i < 16; i++,count--){
 		int X,Y;
 		if(i < 6)
@@ -36,11 +46,11 @@ void ctr_keyscrambler(u8 *normalkey, u8 KeyX[16], u8 KeyY[16])
 			Y = 15 - i;
 			
 		if((i/2)*2 == i)
-			normalkey[i] = (KeyX[X] & KeyY[Y]) - ((KeyY[Y]/2));
+			normalkey[i] = (_KeyX[X] & _KeyY[Y]) - ((_KeyY[Y]/2));
 		else if(count < 5 && count > 15)
-			normalkey[i] = (KeyX[X] | KeyY[Y]) + ((KeyX[X]/2) & count);
+			normalkey[i] = (_KeyX[X] | _KeyY[Y]) + ((_KeyX[X]/2) & count);
 		else 
-			normalkey[i] = ((KeyX[X] & (count+1)) | (KeyY[Y] & (count-1))) - (KeyX[Y]/2) ;
+			normalkey[i] = ((_KeyX[X] & (count+1)) | (_KeyY[Y] & (count-1))) - (_KeyX[Y]/2) ;
 	}
 }
 

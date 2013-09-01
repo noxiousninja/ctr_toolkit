@@ -68,6 +68,7 @@ int ProcessExtData_FS(VSXEContext *ctx)
 int VSXE_SetupInternalContext(VSXEContext *ctx)
 {
 	vsxe_ctx.vsxe = ctx->vsxe;
+	vsxe_ctx.verbose = ctx->Flags[vsxe_verbose];
 	vsxe_ctx.input = ctx->input;
 	vsxe_ctx.output = ctx->output;
 	vsxe_ctx.platform = ctx->platform;
@@ -86,6 +87,11 @@ int VSXE_SetupInternalContext(VSXEContext *ctx)
 	u64 folderTableMaxSize = (sizeof(folder_table_header) + ((u8_to_u32(header->max_slots,LE) - 2)*sizeof(folder_entry)));
 	vsxe_ctx.file_table_offset = align_value(vsxe_ctx.folder_table_offset+folderTableMaxSize,0x1000);
 	
+	if(vsxe_ctx.verbose){
+		printf("[+] Folder Table Offset:    0x%llx\n",vsxe_ctx.folder_table_offset);
+		printf("[+] File Table Offset:      0x%llx\n",vsxe_ctx.file_table_offset);
+	}
+
 	VSXE_InterpreteFolderTable();
 	VSXE_InterpreteFileTable();
 	
@@ -168,7 +174,7 @@ void VSXE_SetupOutputFS(void)
 		chdir(path);
 		for(int j = 2; j < vsxe_ctx.foldercount; j++){
 			if(u8_to_u32(vsxe_ctx.folders[j].parent_folder_index,LE) == i){
-				//printf(" %s\n",vsxe->folders[j].filename);
+				if(vsxe_ctx.verbose) printf("[+] Creating Dir:           '%s'\n",vsxe_ctx.folders[j].filename);
 				makedir(vsxe_ctx.folders[j].filename);
 			}
 		}
@@ -216,28 +222,29 @@ int VSXE_WriteExtdataFiles(void)
 
 int VSXE_ExportExtdataImagetoFile(char *inpath, char *outpath, u8 *ExtdataUniqueID)
 {
-	ExtdataContext ext;
-	InitaliseExtdataContext(&ext);
-	ext.extdata.size = GetFileSize_u64(inpath);
-	ext.extdata.buffer = malloc(ext.extdata.size);
-	memcpy(ext.VSXE_Extdata_ID,ExtdataUniqueID,8);
-	if(ext.extdata.buffer == NULL) return VSXE_MEM_FAIL;
+	ExtdataContext *ext = malloc(sizeof(ExtdataContext));
+	InitaliseExtdataContext(ext);
+	ext->extdata.size = GetFileSize_u64(inpath);
+	ext->extdata.buffer = malloc(ext->extdata.size);
+	memcpy(ext->VSXE_Extdata_ID,ExtdataUniqueID,8);
+	if(ext->extdata.buffer == NULL) return VSXE_MEM_FAIL;
 	FILE *infile = fopen(inpath,"rb");
-	ReadFile_64(ext.extdata.buffer,ext.extdata.size,0,infile);
+	ReadFile_64(ext->extdata.buffer,ext->extdata.size,0,infile);
 	fclose(infile);
-	u8 result = GetExtdataContext(&ext);
+	u8 result = GetExtdataContext(ext);
 	if(result)
 		return result;
-	if(ext.ExtdataType != DataPartition)
+	if(ext->ExtdataType != DataPartition)
 		return VSXE_BAD_EXTDATA_TYPE;
-	if(ext.Files.Count != 1)
+	if(ext->Files.Count != 1)
 		return VSXE_UNEXPECTED_DATA_IN_EXTDATA;
-	if(ext.VSXE_Extdata_ID_Match != True){
+	if(ext->VSXE_Extdata_ID_Match != True){
 		printf("[!] Caution, extdata image '%s' did not have expected identifier\n",inpath);
 	}
 	FILE *outfile = fopen(outpath,"wb");
-	WriteBuffer((ext.extdata.buffer + ext.Files.Data[0].offset),ext.Files.Data[0].size,0,outfile);
-	FreeExtdataContext(&ext);
+	if(vsxe_ctx.verbose) printf("[+] Writing data in '%s' to: '%s'\n",inpath,outpath);
+	WriteBuffer((ext->extdata.buffer + ext->Files.Data[0].offset),ext->Files.Data[0].size,0,outfile);
+	FreeExtdataContext(ext);
 	fclose(outfile);
 	return 0;
 }
@@ -294,6 +301,12 @@ void VSXE_InterpreteFolderTable(void)
 	folder_table_header *header = (folder_table_header*)(vsxe_ctx.vsxe + vsxe_ctx.folder_table_offset);
 	vsxe_ctx.foldercount = u8_to_u32(header->used_slots,LE); // -1
 	vsxe_ctx.folders = (folder_entry*)(vsxe_ctx.vsxe + vsxe_ctx.folder_table_offset + sizeof(folder_table_header) - (2*sizeof(folder_entry)));
+
+	if(vsxe_ctx.verbose){
+		printf("[+] Maximum Folder Entries: %d\n",u8_to_u32(header->max_slots,LE)-2);
+		printf("[+] Used Folder Entries:    %d\n",u8_to_u32(header->used_slots,LE)-2);
+
+	}
 	return;
 }
 
@@ -302,79 +315,11 @@ void VSXE_InterpreteFileTable(void)
 	file_table_header *header = (file_table_header*)(vsxe_ctx.vsxe + vsxe_ctx.file_table_offset);
 	vsxe_ctx.filecount = u8_to_u32(header->used_slots,LE)+1; // -1
 	vsxe_ctx.files = (file_entry*)(vsxe_ctx.vsxe + vsxe_ctx.file_table_offset + sizeof(file_table_header) - (2*sizeof(file_entry)));
+
+	if(vsxe_ctx.verbose){
+		printf("[+] Maximum File Entries:   %d\n",u8_to_u32(header->max_slots,LE)-1);
+		printf("[+] Used File Entries:      %d\n",u8_to_u32(header->used_slots,LE)-1);
+
+	}
 	return;
 }
-
-/**
-void read_vsxe(FILE *file, u32 offset)
-{
-	VSXE_INTERNAL_CONTEXT ctx;
-	ctx.extdata = file;
-	ctx.offset = offset;
-	
-	fseek(ctx.extdata,ctx.offset,SEEK_SET);
-	fread(&ctx.header,sizeof(vsxe_header),1,ctx.extdata);
-	
-	if(VerifyVSXE(&ctx) != 0){
-		printf("[!] Is not a VSXE File Table\n");
-		return;
-	}
-	
-	ctx.folder_table_offset = 0x1000 + ctx.offset;
-	ctx.file_table_offset = 0x2000 + ctx.offset;
-	
-	VSXE_InterpreteFolderTable(&ctx);
-	VSXE_InterpreteFileTable(&ctx);
-	
-	printf("Last Extdata Mount Details:\n");
-	u32 last_extdata_id = u8_to_u32(ctx.header.last_used_file_extdata_id,LE);
-	printf(" ExtData Image ID:     %08x\n",last_extdata_id);
-	printf(" ExtData Mount Path:   %s\n",ctx.header.last_used_file); 
-	
-	printf("ExtData Image Mount locations\n");
-	char *path = malloc(0x100);
-	for(u32 i = 2; i < ctx.filecount; i++){
-		memset(path,0x0,0x100);
-		sprintf(path,"/");
-		VSXE_ReturnExtdataMountPath(&ctx,i,path,UNIX);
-		printf(" Image %08x is mounted at: '%s'\n",i,path);
-	}
-	free(path);
-	
-	
-	free(ctx.folders);
-	free(ctx.files);
-
-	fseek(ctx.extdata,ctx.offset+0x1000+(sizeof(folder_entry)*2),SEEK_SET);
-	printf("\nFolders\n");
-	for(int i = 0; i < ctx.foldercount - 2; i++){
-		folder_entry tmp;
-		fread(&tmp,sizeof(folder_entry),1,ctx.extdata);
-		printf("------------------------------------\n\n");
-		printf("Parent Folder Index:   %d\n",u8_to_u32(tmp.parent_folder_index,LE));
-		printf("Folder Name:           %s\n",tmp.filename);
-		printf("Folder Index:          %d\n",u8_to_u32(tmp.folder_index,LE));
-		printf("UNK1:                  %d\n",u8_to_u32(tmp.unk1,LE));
-		printf("Last File Index:       %d\n",u8_to_u32(tmp.last_file_index,LE));
-		printf("UNK2:                  %d\n",u8_to_u32(tmp.unk2,LE));
-		printf("UNK3:                  %d\n",u8_to_u32(tmp.unk3,LE));
-		printf("\n------------------------------------\n");
-	}
-	fseek(ctx.extdata,ctx.offset+0x2000+(sizeof(file_entry)*1),SEEK_SET);
-	printf("\nFiles\n");
-	for(int i = 0; i < ctx.filecount - 2; i++){
-		file_entry tmp;
-		fread(&tmp,sizeof(file_entry),1,ctx.extdata);
-		printf("------------------------------------\n\n");
-		printf("Parent Folder Index:   %d\n",u8_to_u32(tmp.parent_folder_index,LE));
-		printf("File Name:             %s\n",tmp.filename);
-		printf("File Index:            %d\n",u8_to_u32(tmp.index,LE));
-		printf("UNK1:                  %x\n",u8_to_u32(tmp.unk1,LE));
-		printf("Block Offset:          %x\n",u8_to_u32(tmp.block_offset,LE));
-		printf("File Size:             %llx\n",u8_to_u64(tmp.file_size,LE));
-		printf("UNK2:                  %x\n",u8_to_u32(tmp.unk2,LE));
-		printf("UNK3:                  %x\n",u8_to_u32(tmp.unk3,LE));
-		printf("\n------------------------------------\n");
-	}
-}
-**/

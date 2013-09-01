@@ -19,10 +19,10 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 #include "lib.h"
 
 //MISC
-void char_to_int_array(unsigned char destination[], char source[], int size, int endianness, int base)
+void char_to_u8_array(unsigned char destination[], char source[], int size, int endianness, int base)
 {	
 	char tmp[size][2];
-    unsigned char *byte_array = malloc(size*sizeof(unsigned char));
+    unsigned char byte_array[size];
 	memset(byte_array, 0, size);
 	memset(destination, 0, size);
 	memset(tmp, 0, size*2);
@@ -34,19 +34,6 @@ void char_to_int_array(unsigned char destination[], char source[], int size, int
         byte_array[i] = (unsigned char)strtol(tmp[i], NULL, base);
     }
 	endian_memcpy(destination,byte_array,size,endianness);
-	/**
-	for (int i = 0; i < size; i++){
-        switch (endianness){
-        	case(BIG_ENDIAN):
-        	destination[i] = byte_array[i];
-        	break;
-        	case(LITTLE_ENDIAN):
-        	destination[i] = byte_array[((size-1)-i)];
-        	break;
-        }
-    }
-	**/
-	_free(byte_array);
 }
 
 void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness)

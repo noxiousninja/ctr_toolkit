@@ -32,6 +32,7 @@ typedef enum
 {
 	vsxe_extract = 0,
 	vsxe_show_fs,
+	vsxe_verbose,
 } VSXE_OptionIndex;
 
 typedef enum
@@ -104,6 +105,8 @@ typedef struct
 typedef struct
 {
 	u8 *vsxe;
+
+	u8 verbose;
 	
 	// File I/O Paths
 	char *input;
@@ -129,7 +132,7 @@ typedef struct
 {
 	u8 *vsxe;
 	
-	u8 Flags[2];
+	u8 Flags[3];
 	
 	char *input;
 	char *output;

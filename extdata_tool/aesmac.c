@@ -24,7 +24,6 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 int PrepAESMAC(AESMAC_CTX *ctx)
 {
 	u8 savegame_type[6][8] = {"CTR-EXT0","CTR-SYS0","CTR-NOR0","CTR-SAV0","CTR-SIGN","CTR-9DB0"};
-	memset(ctx->header,0,0x100);
 	memset(ctx->hash,0,0x20);
 	
 	if(ctx->type == 0)
@@ -121,13 +120,19 @@ int GenAESMAC(u8 KeyX[16], u8 KeyY[16], AESMAC_CTX *ctx)
 	ctr_init_aes_cbc(&aes_cbc,outkey,IV,ENC);
 	ctr_aes_cbc(&aes_cbc,ctx->hash,encrypted_hash,0x20,ENC);
 	
-	/**
-	memdump(stdout,"KeyX:              ",KeyX,16);
-	memdump(stdout,"KeyY:              ",KeyY,16);
-	memdump(stdout,"Normal Key:        ",outkey,16);
-	**/
+	if(ctx->Verbose){
+		memdump(stdout," KeyX:              ",KeyX,16);
+		memdump(stdout," KeyY:              ",KeyY,16);
+		memdump(stdout," Normal Key:        ",outkey,16);
+		memdump(stdout," Hash For MAC:      ",ctx->hash,0x20);
+		memdump(stdout," MAC:               ",encrypted_hash+0x10,16);
+	}
+	
 	
 	/* Writing AES MAC to context */
 	memcpy(ctx->aesmac,encrypted_hash+0x10,16);	
+
+	free(outkey);
+	free(encrypted_hash);
 	return 0;
 }
