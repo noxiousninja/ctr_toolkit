@@ -28,7 +28,7 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 typedef enum
 {
 	MAJOR = 2,
-	MINOR = 1
+	MINOR = 2
 } app_version;
 
 typedef enum
@@ -229,6 +229,9 @@ int main(int argc, char *argv[])
 			else if(strcmp(argv[i],"-v") == 0 || strcmp(argv[i],"--verbose") == 0){
 				vsxe_ctx->Flags[vsxe_verbose] = True;
 			}
+			else if(strcmp(argv[i],"-r") == 0 || strcmp(argv[i],"--FStable") == 0){
+				vsxe_ctx->Flags[vsxe_fstable] = True;
+			}
 			else if(strcmp(argv[i],"-a") == 0 && i < argc-1){
 				vsxe->OverrideActiveDIFI = True;
 				vsxe->DIFIPartition = strtol(argv[i+1],NULL,10);
@@ -253,7 +256,7 @@ int main(int argc, char *argv[])
 			return ARG_ERROR;
 		}
 		
-		if(vsxe_ctx->Flags[vsxe_show_fs] == False && vsxe_ctx->Flags[vsxe_extract] == False){
+		if(vsxe_ctx->Flags[vsxe_show_fs] == False && vsxe_ctx->Flags[vsxe_extract] == False && vsxe_ctx->Flags[vsxe_fstable] == False){
 			printf("[!] Nothing to do\n");
 			free(vsxe_ctx);
 			FreeExtdataContext(vsxe);
@@ -613,8 +616,9 @@ void help(char *app_name)
 	printf(" -v, --verbose                                Enable verbose output.\n");
 	printf("Extdata (VSXE) File System Options:\n");
 	printf(" -d, --FSdir=           Dir-in                Specify Extdata FS Directory\n");
-	printf(" -s, --showFS                                 Display VSXE Extdata Mount Points\n");
 	printf(" -f, --extractFS=       Dir-out               Extract VSXE File System\n");
+	printf(" -s, --showFS                                 Display VSXE Extdata Mount Points\n");
+	printf(" -r, --FSTable                                Display VSXE Folder and File Tables\n");
 	printf("Extdata Title Database (BDRI) Options:\n");
 	printf(" -l, --listDB                                 List the Titles in DB\n");
 	printf(" -0, --listTID                                List the Title IDs of the titles in DB\n");

@@ -197,6 +197,9 @@ int VerifyIVFCLevels(void)
 			return Fail;
 		}
 				
+		u8 EmptyHash[0x20];
+		memset(EmptyHash,0,0x20);
+				
 		// Checking each block in current IVFC level
 		for(int j = 0; j < blocknum; j++){
 			if(ext_ctx.Verbose) printf("  Checking Block %d\n",j);
@@ -214,14 +217,15 @@ int VerifyIVFCLevels(void)
 			
 			u8 ActualHash[0x20];
 			ctr_sha_256(DataToHash,blocksize,ActualHash);			
-			
-			//memdump(stdout,"BLOCK: ",IVFC_Block,blocksize);
-			
+						
 			// Storing result
-			hashtable.IVFC_Level_Validity[i] += memcmp(ActualHash,ExpectedHash,0x20);
-			if(ext_ctx.Verbose){
-				memdump(stdout,"  Expected Hash:   ",ExpectedHash,0x20);
-				memdump(stdout,"  Actual Hash:     ",ActualHash,0x20);
+			if(memcmp(EmptyHash,ExpectedHash,0x20) != 0){
+				hashtable.IVFC_Level_Validity[i] += memcmp(ActualHash,ExpectedHash,0x20);
+				if(ext_ctx.Verbose){
+					memdump(stdout,"  Expected Hash:   ",ExpectedHash,0x20);
+					memdump(stdout,"  Actual Hash:     ",ActualHash,0x20);
+				
+				}
 			}
 			//else{
 			//	printf("  Good\n");
@@ -251,6 +255,8 @@ int CreateExtdata(COMPONENT_STRUCT *out, COMPONENT_STRUCT *in, int type, u32 act
 	ctx.ActiveDIFI = active_difi;
 	memcpy(ctx.UniqueExtdataID,unique_extdata_id,8);
 	
+	
+	// Getting IVFC Level Block Sizes
 	ctx.IVFC_BLK_SIZE[level1] = 0x200;
 	ctx.IVFC_BLK_SIZE[level2] = 0x200;
 	ctx.IVFC_BLK_SIZE[level3] = 0x1000;
@@ -260,67 +266,56 @@ int CreateExtdata(COMPONENT_STRUCT *out, COMPONENT_STRUCT *in, int type, u32 act
 		ctx.IVFC_BLK_SIZE[level4] = 0x200;
 	}
 	
+	// Getting IVFC Level Sizes
 	ctx.IVFC_SIZE[level4] = in->size;
 	for(int i = level3; i >= level1; i--)
 		ctx.IVFC_SIZE[i] = (align_value(ctx.IVFC_SIZE[i+1],ctx.IVFC_BLK_SIZE[i+1])/ctx.IVFC_BLK_SIZE[i+1])*0x20;
 	
+	// Getting Master Hash Blob size;
+	ctx.IVFC_MASTER_HASH.size = ((align_value(ctx.IVFC_SIZE[level1],ctx.IVFC_BLK_SIZE[level1]) / ctx.IVFC_BLK_SIZE[level1]))*0x20;
+	ctx.IVFC_MASTER_HASH.buffer = malloc(ctx.IVFC_MASTER_HASH.size);
+	
+	// Getting DIFI Partition Size/Offsets
+	ctx.PARTITION_SIZE = sizeof(DIFI_PARTITION) + ctx.IVFC_MASTER_HASH.size;
+	ctx.PARTITION_OFFSET[Secondary] = 0x100 + sizeof(DIFF_STRUCT);
+	ctx.PARTITION_OFFSET[Primary] = ctx.PARTITION_OFFSET[Secondary] + align_value(ctx.PARTITION_SIZE,0x10);
+	
+	// Getting IVFC Relative Offsets
 	ctx.IVFC_OFFSET[level1] = 0;
 	for(int i = level2; i <= level4; i++){
 		ctx.IVFC_OFFSET[i] = ctx.IVFC_SIZE[i-1] + ctx.IVFC_OFFSET[i-1];
 		if(ctx.IVFC_SIZE[i] > ctx.IVFC_BLK_SIZE[i] && ctx.IVFC_SIZE[i] >= 0x4000 /*Seems to be the case*/)
 			ctx.IVFC_OFFSET[i] = align_value(ctx.IVFC_OFFSET[i],ctx.IVFC_BLK_SIZE[i]);
 	}
-		
+
+	// Getting File Base Offset
+	ctx.FB_OFFSET = align_value(ctx.PARTITION_OFFSET[Primary] + align_value(ctx.PARTITION_SIZE,0x10),0x1000);
+	if(type == BUILD_DB) ctx.FB_OFFSET = 0x600;
 	
+	// Getting DPFS Blob
+	ctx.TableOffset[table1] = 0x0;
+	ctx.TableSize[table1] = 0x4;
+	ctx.TableBLKSize[table1] = 0x1;	
+	ctx.TableOffset[table2] = 0x8;
+	ctx.TableSize[table2] = 0x80;
+	ctx.TableBLKSize[table2] = 0x80;
+	ctx.TableOffset[tableivfc] = 0x1000;
+	ctx.TableBLKSize[tableivfc] = 0x1000;
+	if(type == BUILD_DB){
+		ctx.TableOffset[tableivfc] = 0x200;
+		ctx.TableBLKSize[tableivfc] = 0x200;
+	}
 	if(type == BUILD_DATA){
-		ctx.FB_OFFSET = 0x1000;
-	
-		//DPFS Data
-		ctx.TableOffset[table1] = 0x0;
-		ctx.TableSize[table1] = 0x4;
-		ctx.TableBLKSize[table1] = 0x1;
-		
-		ctx.TableOffset[table2] = 0x8;
-		ctx.TableSize[table2] = 0x80;
-		ctx.TableBLKSize[table2] = 0x80;
-		
-		// IN Data partitions the embedded file is located outside the IVFC tree, so the DPFS IVFC
-		// Size is over the first three levels instead of all four
-		ctx.TableOffset[tableivfc] = 0x1000;
 		ctx.TableSize[tableivfc] = align_value(ctx.IVFC_OFFSET[level3]+ctx.IVFC_SIZE[level3],ctx.IVFC_BLK_SIZE[level3]);
-		ctx.TableBLKSize[tableivfc] = 0x1000;
-		
 		ctx.DATA_OFFSET = ctx.TableOffset[tableivfc] + ctx.TableSize[tableivfc]*2;
 		ctx.FB_SIZE = ctx.DATA_OFFSET + ctx.IVFC_SIZE[level4];
 		ctx.TotalSize = ctx.FB_OFFSET + ctx.FB_SIZE;
-		
 		ctx.AbsoluteFileOffset = ctx.FB_OFFSET + ctx.DATA_OFFSET;
 	}
 	else{
-		ctx.FB_OFFSET = 0x1000;
-		if(type == BUILD_DB) ctx.FB_OFFSET = 0x600;
-		
-		//DPFS Data
-		ctx.TableOffset[table1] = 0x0;
-		ctx.TableSize[table1] = 0x4;
-		ctx.TableBLKSize[table1] = 0x1;
-		
-		ctx.TableOffset[table2] = 0x8;
-		ctx.TableSize[table2] = 0x80;
-		ctx.TableBLKSize[table2] = 0x80;
-		
-		// As there is not data partition, the IVFC size includes level4
-		ctx.TableOffset[tableivfc] = 0x1000;
-		ctx.TableBLKSize[tableivfc] = 0x1000;
-		if(type == BUILD_DB){
-			ctx.TableOffset[tableivfc] = 0x200;
-			ctx.TableBLKSize[tableivfc] = 0x200;
-		}
 		ctx.TableSize[tableivfc] = align_value(ctx.IVFC_OFFSET[level4]+ctx.IVFC_SIZE[level4],ctx.TableBLKSize[tableivfc]);
-		
 		ctx.FB_SIZE = ctx.FB_OFFSET + ctx.TableSize[tableivfc]*2;
 		ctx.TotalSize = ctx.FB_OFFSET + ctx.FB_SIZE;
-		
 		ctx.AbsoluteFileOffset = ctx.FB_OFFSET + ctx.TableOffset[tableivfc] + ctx.IVFC_OFFSET[level4];
 	}
 	
@@ -385,10 +380,7 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 		u64 blocksize = ctx->IVFC_BLK_SIZE[i];
 		u32 blocknum = (align_value(size,blocksize) / blocksize);
 		
-		if(i == level1){
-			ctx->IVFC_MASTER_HASH.size = blocknum*0x20;
-			ctx->IVFC_MASTER_HASH.buffer = malloc(ctx->IVFC_MASTER_HASH.size);
-		}
+		
 		
 		// The number of blocks in the current level must match the number of hashes in the previous level
 		if(hashcount != blocknum && i > level1){ 
@@ -402,6 +394,10 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 			printf("[!] Failed to allocate memory for checking IVFC Level %d\n",i+1);
 			return Fail;
 		}
+		memset(IVFC_Block,0,blocksize);
+		u8 EmptyBlockHash[0x20];
+		ctr_sha_256(IVFC_Block,blocksize,EmptyBlockHash);	
+		
 				
 		// Checking each block in current IVFC level
 		for(int j = 0; j < blocknum; j++){
@@ -421,7 +417,8 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 			u8 *WriteHashOffset = outbuff + prev_offset + (j*0x20);
 			if(i==level1) WriteHashOffset = ctx->IVFC_MASTER_HASH.buffer + (j*0x20);
 			
-			ctr_sha_256(BlockLocation,blocksize,WriteHashOffset);			
+			ctr_sha_256(BlockLocation,blocksize,WriteHashOffset);
+			if(memcmp(WriteHashOffset,EmptyBlockHash,0x20) == 0) memset(WriteHashOffset,0,0x20);
 		}
 		
 		// Freeing block
@@ -436,11 +433,6 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 
 int GenerateDIFIPartitions(CreateExtdataCTX *ctx, u8 *outbuff)
 {
-	
-	ctx->PARTITION_SIZE = sizeof(DIFI_PARTITION) + ctx->IVFC_MASTER_HASH.size;
-	ctx->PARTITION_OFFSET[Secondary] = 0x200;
-	ctx->PARTITION_OFFSET[Primary] = 0x200 + align_value(ctx->PARTITION_SIZE,0x10);
-
 	DIFI_PARTITION partition[2];
 	memset(&partition,0,sizeof(DIFI_PARTITION)*2);
 	for(u32 i = 0; i < 2; i++){

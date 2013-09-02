@@ -33,6 +33,7 @@ typedef enum
 	vsxe_extract = 0,
 	vsxe_show_fs,
 	vsxe_verbose,
+	vsxe_fstable,
 } VSXE_OptionIndex;
 
 typedef enum
@@ -47,10 +48,10 @@ typedef struct
 	u8 parent_folder_index[4];
     char filename[0x10];
     u8 unk0[4];
+    u8 last_folder_index[4]; 
+    u8 last_file_index[4];
     u8 unk1[4]; 
     u8 unk2[4];
-    u8 unk3[4]; 
-    u8 unk4[4];
 } folder_entry;
 
 typedef struct
@@ -58,11 +59,11 @@ typedef struct
 	u8 parent_folder_index[4];
     char filename[0x10];
     u8 unk0[4];
-    u8 unk1[4]; // magic?
+    u8 unk1[4]; 
     u8 unk2[4];
     u8 unique_extdata_id[8];
-    u8 unk4[4]; // flags?
-    u8 unk5[4];
+    u8 unk3[4]; 
+    u8 unk4[4];
 } file_entry;
 
 typedef struct
@@ -79,7 +80,7 @@ typedef struct
 	u8 data_table_offset[8];
 	u8 filesizeX[8];
 	u8 filesizeY[8];
-	u8 unk1[0x8];
+	u8 unk1[8];
 	u8 last_used_file_action[4];
 	u8 unk2[4];
 	u8 last_used_file_extdata_id[4];
@@ -91,7 +92,7 @@ typedef struct
 {
 	u8 used_slots[4];
 	u8 max_slots[4];
-	u8 reserved[0x48];
+	u8 reserved[0x20];
 } folder_table_header;
 
 typedef struct
@@ -106,6 +107,8 @@ typedef struct
 {
 	u8 *vsxe;
 
+	u8 showfs;
+	u8 showfs_tables;
 	u8 verbose;
 	
 	// File I/O Paths
