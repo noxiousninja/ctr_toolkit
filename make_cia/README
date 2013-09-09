@@ -3,6 +3,11 @@ Version: 6.1 2013 (C) 3DSGuy
 
 /******** Change Log ********/
 
+Version 6.2:
+* Instances of strtol were replaced with strtoul when user could provide acceptable input which strtol cannot convert.
+* Code for calculating the Context index in the CIA header has been re-written, it now supports any and all index values a given content may have(0-65535).
+* Prevents user from creating CIA files where contents have conflicting index/id values
+
 Version 6.1:
 * Updated TMD Struct, and code surrounding it
 

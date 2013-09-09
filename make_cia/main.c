@@ -27,7 +27,7 @@ along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 typedef enum
 {
 	MAJOR = 6,
-	MINOR = 1
+	MINOR = 2
 } AppVer;
 
 void app_title(void);
@@ -165,4 +165,5 @@ void help(char *app_name)
 	printf("SPECIAL BUILD OPTIONS\n");
 	printf(" --srl=                 File-in               Specify a SRL for content0.\n");
 	printf(" --rom=                 File-in               Convert ROM to CIA.\n");
+	//printf(" --cdn=                 Dir-in                Re-package CDN Content to CIA\n"); // eventually make_cdn_cia will be merged with make_cia
 }

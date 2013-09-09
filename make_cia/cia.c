@@ -94,12 +94,26 @@ int SetupCIAHeader(USER_CONTEXT *ctx)
 	u32_to_u8(cia_header.meta_size,ctx->cia_section[meta].size,LITTLE_ENDIAN);
 	u64_to_u8(cia_header.content_size,ctx->cia_section[content].size,LITTLE_ENDIAN);
 	
-	//SetCIAContentIndex
-	u64 content_index_flag = 0;
+	// SetCIAContentIndex, actually works for all index values now. CIA files generated can now hold, with
+	// validity, 65536 contents. Or at least have a content with index value of 65535
 	for(int i = 0; i < ctx->ContentCount; i++){
-		content_index_flag += (0x8000000000000000/(2<<ctx->ContentInfo[i].content_index))*2;
+		// This works by treating the 0x2000 byte index array as an array of 2048 u32 values
+		
+		// Used for determining which u32 chunk to write the value to
+		u16 section = ctx->ContentInfo[i].content_index/32;
+		
+		// Calculating the value added to the u32
+		u32 value = 0x80000000/(1<<ctx->ContentInfo[i].content_index);
+		
+		// Retrieving current u32 block
+		u32 cur_content_index_section = u8_to_u32(cia_header.content_index+(sizeof(u32)*section),BE);
+		
+		// Adding value to block
+		cur_content_index_section += value;
+		
+		// Returning block
+		u32_to_u8(cia_header.content_index+(sizeof(u32)*section),cur_content_index_section,BE);
 	}
-	u64_to_u8(cia_header.content_index,content_index_flag,BE);
 	
 	memcpy(ctx->cia_section[header].buffer,&cia_header,ctx->cia_section[header].size);
 	return 0;

@@ -134,7 +134,7 @@ int GetContentData(USER_CONTEXT *ctx, int argc, char *argv[])
 					memcpy(ctx->ContentInfo[i].file_path,argv[j]+strlen(path),strlen(argv[j]+strlen(path)));
 				}
 				else if(strncmp(argv[j],id,strlen(id)) == 0){
-					u32 content_id = strtol(argv[j]+strlen(id),NULL,16);
+					u32 content_id = strtoul(argv[j]+strlen(id),NULL,16);
 					u32_to_u8(ctx->ContentInfo[i].content_id,content_id,BE);
 				}
 				else if(strncmp(argv[j],index,strlen(index)) == 0){
@@ -179,6 +179,27 @@ int GetContentData(USER_CONTEXT *ctx, int argc, char *argv[])
 		}
 	}
 	
+	// Stopping program flow if user has specified contents with conflicting indexes or IDs
+	for(int i = 0; i < ctx->ContentCount-1; i++){
+		u16 current_index = ctx->ContentInfo[i].content_index;
+		u32 current_id = u8_to_u32(ctx->ContentInfo[i].content_id,BE);
+		u16 other_index = 0;
+		u32 other_id = 0;
+		for(int j = 0; j < ctx->ContentCount; j++){
+			if(i!=j){
+				other_index = ctx->ContentInfo[j].content_index;
+				other_id = u8_to_u32(ctx->ContentInfo[j].content_id,BE);
+				if(current_index == other_index){
+					printf("[!] Content%d and Content%d have conflicting content indexes\n",i,j);
+					return Fail;
+				}
+				if(current_id == other_id){
+					printf("[!] Content%d and Content%d have conflicting content IDs\n",i,j);
+					return Fail;
+				}
+			}
+		}
+	}
 	return 0;
 }
 
@@ -483,7 +504,7 @@ int SetBuildSettings(USER_CONTEXT *ctx, int argc, char *argv[])
 				printf("[!] Invalid length for Ticket ID\n");
 		}
 		else if(strncmp(argv[i],"--savesize=",11) == 0){
-			u32 savesize = strtol(argv[i]+11, NULL, 10)*1024;
+			u32 savesize = strtoul(argv[i]+11, NULL, 10)*1024;
 			u32_to_u8(ctx->core.save_data_size,savesize,LE);
 		}
 		else if(strncmp(argv[i],"--titleID=",10) == 0){
@@ -523,7 +544,7 @@ int SetBuildSettings(USER_CONTEXT *ctx, int argc, char *argv[])
 				printf("[!] Invalid length for Ticket ID\n");
 		}
 		else if(strncmp(argv[i],"-0",2) == 0){
-			u32 savesize = strtol(argv[i+1], NULL, 10)*1024;
+			u32 savesize = strtoul(argv[i+1], NULL, 10)*1024;
 			u32_to_u8(ctx->core.save_data_size,savesize,LE);
 		}
 		else if(strncmp(argv[i],"-2",2) == 0){
