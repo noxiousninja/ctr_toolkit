@@ -63,15 +63,15 @@ int GenerateTitleMetaData(USER_CONTEXT *ctx)
 	u32_to_u8(sig.sig_type,RSA_2048_SHA256,BE);
 	u8 hash[0x20];
 	memset(&hash,0x0,0x20);
-	ctr_sha_256(info_chunk,(sizeof(TMD_CONTENT_CHUNK_STRUCT)*ctx->ContentCount),info_record->sha_256_hash);
+	ctr_sha(info_chunk,(sizeof(TMD_CONTENT_CHUNK_STRUCT)*ctx->ContentCount),info_record->sha_256_hash,CTR_SHA_256);
 	//memdump(stdout,"Info Chunk Hash:       ",info_record->sha_256_hash,0x20);
-	ctr_sha_256(info_record,(sizeof(TMD_CONTENT_INFO_RECORD)*0x40),header.sha_256_hash);
+	ctr_sha(info_record,(sizeof(TMD_CONTENT_INFO_RECORD)*0x40),header.sha_256_hash,CTR_SHA_256);
 	//memdump(stdout,"Info Record Hash:       ",header.sha_256_hash,0x20);
-	ctr_sha_256(&header,sizeof(TMD_STRUCT),hash);
+	ctr_sha(&header,sizeof(TMD_STRUCT),hash,CTR_SHA_256);
 	//memdump(stdout,"Header Hash:       ",hash,0x20);
 
 	if(ctx->flags[verbose]) { printf(" > Signing TMD\n"); }
-	if(ctr_rsa2048_sha256_sign(hash,sig.data,ctx->keys.tmd.n,ctx->keys.tmd.d) != Good){
+	if(ctr_rsa(hash,sig.data,ctx->keys.tmd.n,ctx->keys.tmd.d,RSA_2048_SHA256,CTR_RSA_SIGN) != Good){
 		printf("[!] Failed to sign tmd\n");
 		_free(info_record);
 		_free(info_chunk);

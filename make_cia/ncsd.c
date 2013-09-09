@@ -39,14 +39,14 @@ int GetNCSDData(USER_CONTEXT *ctx, NCSD_STRUCT *ncsd_struct, FILE *ncsd)
 	fseek(ncsd,0x1200,SEEK_SET);
 	fread(&dev_card_info,sizeof(DEV_CARD_INFO_HEADER),1,ncsd);
 	
-	ctr_sha_256(&header,sizeof(NCSD_HEADER),ncsd_struct->ncsd_header_hash);
+	ctr_sha(&header,sizeof(NCSD_HEADER),ncsd_struct->ncsd_header_hash,CTR_SHA_256);
 	
 	if(u8_to_u32(header.magic,BE) != NCSD_MAGIC){
 		printf("[!] ROM is Corrupt\n");
 		return Fail;
 	}
 	
-	ncsd_struct->sig_valid = ctr_rsa2048_sha256_verify(ncsd_struct->ncsd_header_hash,ncsd_struct->signature,ctx->keys.NcsdCfa.n);
+	ncsd_struct->sig_valid = ctr_rsa(ncsd_struct->ncsd_header_hash,ncsd_struct->signature,ctx->keys.NcsdCfa.n,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
 	
 	u32 media_size = ((header.partition_flags[6] + 1)*0x200);
 	
@@ -156,8 +156,8 @@ int VerifyNCSD(USER_CONTEXT *ctx, FILE *ncsd)
 	fseek(ncsd,0x0,SEEK_SET);
 	fread(HeaderSignature,0x100,1,ncsd);
 	fread(Header,0x100,1,ncsd);
-	ctr_sha_256(&Header,0x100,HeaderSHAHash);	
-	switch(ctr_rsa2048_sha256_verify(HeaderSHAHash,HeaderSignature,ctx->keys.NcsdCfa.n)){
+	ctr_sha(&Header,0x100,HeaderSHAHash,CTR_SHA_256);	
+	switch(ctr_rsa(HeaderSHAHash,HeaderSignature,ctx->keys.NcsdCfa.n,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY)){
 		case Good : printf("[+] NCSD header is valid\n"); break;
 		case Fail : printf("[+] NCSD header is invalid\n"); break;
 	}
@@ -184,7 +184,7 @@ int VerifyNCCHSection(USER_CONTEXT *ctx, u8 cxi_key[0x10], u32 offset, FILE *ncc
 	fseek(ncch,offset+0x0,SEEK_SET);
 	fread(HeaderSignature,0x100,1,ncch);
 	fread(Header,0x100,1,ncch);
-	ctr_sha_256(&Header,0x100,HeaderSHAHash);
+	ctr_sha(&Header,0x100,HeaderSHAHash,CTR_SHA_256);
 	
 	RSA_2048_KEY HeaderRSA;
 	memset(&HeaderRSA,0x0,sizeof(RSA_2048_KEY));
@@ -198,7 +198,7 @@ int VerifyNCCHSection(USER_CONTEXT *ctx, u8 cxi_key[0x10], u32 offset, FILE *ncc
 		goto prep_cxi_validate;
 		
 validate_header:
-	return ctr_rsa2048_sha256_verify(HeaderSHAHash,HeaderSignature,ctx->keys.NcsdCfa.n);
+	return ctr_rsa(HeaderSHAHash,HeaderSignature,ctx->keys.NcsdCfa.n,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
 
 prep_cxi_validate:
 	//Getting Exheader

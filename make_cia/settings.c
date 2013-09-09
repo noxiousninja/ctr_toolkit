@@ -321,9 +321,11 @@ int GetCoreData(USER_CONTEXT *ctx, int argc, char *argv[])
 	ctx->core.ca_crl_version = 0x0;
 	ctx->core.signer_crl_version = 0x0;
 	
-	u8 hash[0x20];
-	ctr_sha_256(ctx->core_infile.argument,100,hash);
-	memcpy(ctx->core.TicketID,&hash,0x8);
+	// This is the equivalent method used by ctr_makecia32 to generate the ticket ID
+	u8 hash[0x14];
+	ctr_sha(ctx->core_infile.argument,ctx->core_infile.arg_len,hash,CTR_SHA_1);
+	endian_memcpy(ctx->core.TicketID,hash,0x8,LE);
+	
 	fclose(input);
 	return 0;
 }
@@ -466,7 +468,7 @@ int SetCryptoSettings(USER_CONTEXT *ctx, int argc, char *argv[])
 				return Fail;
 			}
 			u8 hash[0x20];
-			ctr_sha_256(buff,16,hash);
+			ctr_sha(buff,16,hash,CTR_SHA_256);
 			memcpy(ctx->keys.title_key,hash,16);
 			_free(buff);
 		}
@@ -654,6 +656,6 @@ void GetRandomContentID(u8 *contentID, u16 value)
 	u16 *rand = malloc(8*sizeof(u16));
 	rand[0] = value*4;
 	u8 hash[0x20];
-	ctr_sha_256(rand,8*sizeof(u16),hash);
+	ctr_sha(rand,8*sizeof(u16),hash,CTR_SHA_256);
 	memcpy(contentID,&hash,0x4);
 }

@@ -62,8 +62,8 @@ int GenerateTicket(USER_CONTEXT *ctx)
 	if(ctx->flags[verbose]) { printf(" > Signing Ticket\n"); }
 	u32_to_u8(sig.sig_type,RSA_2048_SHA256,BE);
 	u8 hash[0x20];
-	ctr_sha_256(&ticket,sizeof(TICKET_STRUCTURE),hash);
-	if(ctr_rsa2048_sha256_sign(hash,sig.data,ctx->keys.ticket.n,ctx->keys.ticket.d) != Good){
+	ctr_sha(&ticket,sizeof(TICKET_STRUCTURE),hash,CTR_SHA_256);
+	if(ctr_rsa(hash,sig.data,ctx->keys.ticket.n,ctx->keys.ticket.d,RSA_2048_SHA256,CTR_RSA_SIGN) != Good){
 		printf("[!] Failed to sign ticket\n");
 		return ticket_gen_fail;
 	}

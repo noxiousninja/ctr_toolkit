@@ -58,7 +58,7 @@ int SetupContent(USER_CONTEXT *ctx)
 		}
 		fseek_64(content_file,ctx->ContentInfo[i].file_offset,SEEK_SET);
 		fread((ctx->cia_section[content].buffer + ContentOffsetStart),TrueSize,1,content_file);
-		ctr_sha_256((ctx->cia_section[content].buffer + ContentOffsetStart),ctx->ContentInfo[i].content_size,ctx->ContentInfo[i].sha_256_hash);
+		ctr_sha((ctx->cia_section[content].buffer + ContentOffsetStart),ctx->ContentInfo[i].content_size,ctx->ContentInfo[i].sha_256_hash,CTR_SHA_256);
 		if(ctx->ContentInfo[i].encrypted == True){
 			if(ctx->flags[verbose]) { printf(" [Encrypted]"); }
 			EncryptContent((ctx->cia_section[content].buffer + ContentOffsetStart),(ctx->cia_section[content].buffer + ContentOffsetStart),ctx->ContentInfo[i].content_size,ctx->keys.title_key,ctx->ContentInfo[i].content_index);

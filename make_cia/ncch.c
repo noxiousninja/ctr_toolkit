@@ -141,7 +141,7 @@ int VerifyNCCH(USER_CONTEXT *ctx, u32 offset, FILE *ncch)
 	fseek(ncch,offset+0x0,SEEK_SET);
 	fread(HeaderSignature,0x100,1,ncch);
 	fread(Header,0x100,1,ncch);
-	ctr_sha_256(&Header,0x100,HeaderSHAHash);
+	ctr_sha(&Header,0x100,HeaderSHAHash,CTR_SHA_256);
 	
 	u8 modulus[0x100];
 	
@@ -153,7 +153,7 @@ int VerifyNCCH(USER_CONTEXT *ctx, u32 offset, FILE *ncch)
 		goto prep_cxi_validate;
 		
 validate_header:
-	switch(ctr_rsa2048_sha256_verify(HeaderSHAHash,HeaderSignature,modulus)){
+	switch(ctr_rsa(HeaderSHAHash,HeaderSignature,modulus,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY)){
 		case Good : printf("[+] NCCH header is valid\n"); break;
 		case Fail : printf("[+] NCCH header is invalid\n"); break;
 	}

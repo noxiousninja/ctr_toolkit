@@ -1,7 +1,12 @@
 CTR_Toolkit - make_cia - Generates CIA files
-Version: 6.1 2013 (C) 3DSGuy
+Version: 6.3 2013 (C) 3DSGuy
 
 /******** Change Log ********/
+
+Version 6.3:
+* Polarssl library updated, and more modules included (SHA1 being a noteworthy inclusion)
+* RSA functions have been unified and made simpler, plus more features
+* TicketID is now generated in the same way ctr_makecia32 does
 
 Version 6.2:
 * Instances of strtol were replaced with strtoul when user could provide acceptable input which strtol cannot convert.
