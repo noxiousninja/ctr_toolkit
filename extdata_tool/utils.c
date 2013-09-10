@@ -10,11 +10,11 @@ the Free Software Foundation, either version 3 of the License, or
 
 extdata_tool is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
+along with extdata_tool.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "lib.h"
 
@@ -22,7 +22,7 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 void char_to_u8_array(unsigned char destination[], char source[], int size, int endianness, int base)
 {	
 	char tmp[size][2];
-    unsigned char byte_array[size];
+    unsigned char *byte_array = malloc(size*sizeof(unsigned char));
 	memset(byte_array, 0, size);
 	memset(destination, 0, size);
 	memset(tmp, 0, size*2);
@@ -34,16 +34,17 @@ void char_to_u8_array(unsigned char destination[], char source[], int size, int 
         byte_array[i] = (unsigned char)strtol(tmp[i], NULL, base);
     }
 	endian_memcpy(destination,byte_array,size,endianness);
+	_free(byte_array);
 }
 
 void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness)
 { 
     for (u32 i = 0; i < size; i++){
         switch (endianness){
-            case(BIG_ENDIAN):
+            case(BE):
                 destination[i] = source[i];
                 break;
-            case(LITTLE_ENDIAN):
+            case(LE):
                 destination[i] = source[((size-1)-i)];
                 break;
         }
@@ -62,9 +63,9 @@ void u8_hex_print_le(u8 *array, int len)
 		printf("%02x",array[len - i - 1]);
 }
 
-u64 align_value(u64 value, u64 alignment)
+u32 align_value(u32 value, u32 alignment)
 {
-	u64 tmp = value;
+	u32 tmp = value;
 	while(tmp > alignment)
 		tmp -= alignment;
 	return (value + (alignment - tmp));
@@ -120,26 +121,16 @@ int append_filextention(char *output, u16 max_outlen, char *input, char extentio
 }
 
 //IO Related
-int ExportFileToFile(FILE *in, FILE *out, u64 size, u64 in_offset, u64 out_offset)
-{
-	u8 *buffer = malloc(size);
-	if(buffer == NULL)
-		return IO_FAIL;
-	ReadFile_64(buffer,size,in_offset,in);
-	WriteBuffer(buffer,size,out_offset,out);
-	return 0;
-}
-
 void WriteBuffer(void *buffer, u64 size, u64 offset, FILE *output)
 {
 	fseek_64(output,offset,SEEK_SET);
 	fwrite(buffer,size,1,output);
 } 
 
-int ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
+void ReadFile_64(void *outbuff, u64 size, u64 offset, FILE *file)
 {
 	fseek_64(file,offset,SEEK_SET);
-	return fread(outbuff,size,1,file);
+	fread(outbuff,size,1,file);
 }
 
 u64 GetFileSize_u64(char *filename)
@@ -202,7 +193,7 @@ int fseek_64(FILE *fp, u64 file_pos, int whence)
 {
 #ifdef _WIN32
 	if(whence != SEEK_SET)
-		printf("[!] fseek_64, whence has been overridden to SEEK_SET\n");
+		printf("[!] fseek_64, whence has been overided to SEEK_SET\n");
 	fpos_t pos = file_pos;
 	return fsetpos(fp,&pos); //I can't believe the 2gb problem with Windows & MINGW, maybe I have a bad installation :/
 #else
@@ -239,8 +230,8 @@ u16 u8_to_u16(u8 *value, u8 endianness)
 {
 	u16 new_value;
 	switch(endianness){
-		case(BIG_ENDIAN): new_value =  (value[1]<<0) | (value[0]<<8); break;
-		case(LITTLE_ENDIAN): new_value = (value[0]<<0) | (value[1]<<8); break;
+		case(BE): new_value =  (value[1]<<0) | (value[0]<<8); break;
+		case(LE): new_value = (value[0]<<0) | (value[1]<<8); break;
 	}
 	return new_value;
 }
@@ -249,8 +240,8 @@ u32 u8_to_u32(u8 *value, u8 endianness)
 {
 	u32 new_value;
 	switch(endianness){
-		case(BIG_ENDIAN): new_value = (value[3]<<0) | (value[2]<<8) | (value[1]<<16) | (value[0]<<24); break;
-		case(LITTLE_ENDIAN): new_value = (value[0]<<0) | (value[1]<<8) | (value[2]<<16) | (value[3]<<24); break;
+		case(BE): new_value = (value[3]<<0) | (value[2]<<8) | (value[1]<<16) | (value[0]<<24); break;
+		case(LE): new_value = (value[0]<<0) | (value[1]<<8) | (value[2]<<16) | (value[3]<<24); break;
 	}
 	return new_value;
 }
@@ -260,7 +251,7 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 {
 	u64 u64_return = 0;
 	switch(endianness){
-		case(BIG_ENDIAN): 
+		case(BE): 
 			u64_return |= (u64)value[7]<<0;
 			u64_return |= (u64)value[6]<<8;
 			u64_return |= (u64)value[5]<<16;
@@ -271,7 +262,7 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 			u64_return |= (u64)value[0]<<56;
 			break;
 			//return (value[7]<<0) | (value[6]<<8) | (value[5]<<16) | (value[4]<<24) | (value[3]<<32) | (value[2]<<40) | (value[1]<<48) | (value[0]<<56);
-		case(LITTLE_ENDIAN): 
+		case(LE): 
 			u64_return |= (u64)value[0]<<0;
 			u64_return |= (u64)value[1]<<8;
 			u64_return |= (u64)value[2]<<16;
@@ -289,11 +280,11 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 int u16_to_u8(u8 *out_value, u16 in_value, u8 endianness)
 {
 	switch(endianness){
-		case(BIG_ENDIAN):
+		case(BE):
 			out_value[0]=(in_value >> 8);
 			out_value[1]=(in_value >> 0);
 			break;
-		case(LITTLE_ENDIAN):
+		case(LE):
 			out_value[0]=(in_value >> 0);
 			out_value[1]=(in_value >> 8);
 			break;
@@ -304,13 +295,13 @@ int u16_to_u8(u8 *out_value, u16 in_value, u8 endianness)
 int u32_to_u8(u8 *out_value, u32 in_value, u8 endianness)
 {
 	switch(endianness){
-		case(BIG_ENDIAN):
+		case(BE):
 			out_value[0]=(in_value >> 24);
 			out_value[1]=(in_value >> 16);
 			out_value[2]=(in_value >> 8);
 			out_value[3]=(in_value >> 0);
 			break;
-		case(LITTLE_ENDIAN):
+		case(LE):
 			out_value[0]=(in_value >> 0);
 			out_value[1]=(in_value >> 8);
 			out_value[2]=(in_value >> 16);
@@ -323,7 +314,7 @@ int u32_to_u8(u8 *out_value, u32 in_value, u8 endianness)
 int u64_to_u8(u8 *out_value, u64 in_value, u8 endianness)
 {
 	switch(endianness){
-		case(BIG_ENDIAN):
+		case(BE):
 			out_value[0]=(in_value >> 56);
 			out_value[1]=(in_value >> 48);
 			out_value[2]=(in_value >> 40);
@@ -333,7 +324,7 @@ int u64_to_u8(u8 *out_value, u64 in_value, u8 endianness)
 			out_value[6]=(in_value >> 8);
 			out_value[7]=(in_value >> 0);
 			break;
-		case(LITTLE_ENDIAN):
+		case(LE):
 			out_value[0]=(in_value >> 0);
 			out_value[1]=(in_value >> 8);
 			out_value[2]=(in_value >> 16);
@@ -376,6 +367,7 @@ void memdump(FILE* fout, const char* prefix, const u8* data, u32 size)
 	}
 }
 
+
 // Adapted from http://rosettacode.org/wiki/Sorting_algorithms/Merge_sort#C
 
 void merge(u64 *left, int l_len, u64 *right, int r_len, u64 *out)
@@ -409,4 +401,3 @@ void merge_sort(u64 *buf, int len)
 	recur(buf, tmp, len);
 	free(tmp);
 }
-

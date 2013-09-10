@@ -65,7 +65,7 @@ int GetExtdataContext(ExtdataContext *ctx)
 	
 	// Getting Data from Active DIFI
 	u8 ActualActivePartitionHash[0x20];
-	ctr_sha_256(ext_ctx.extdata+ext_ctx.DIFIPartitions[ext_ctx.ActivePartition],ext_ctx.DIFIPartitionSize,ActualActivePartitionHash);
+	ctr_sha(ext_ctx.extdata+ext_ctx.DIFIPartitions[ext_ctx.ActivePartition],ext_ctx.DIFIPartitionSize,ActualActivePartitionHash,CTR_SHA_256);
 	if(memcmp(ActualActivePartitionHash,diff->active_partition_hash,0x20) != 0){
 		hashtable.ActivePartitionValid++;
 		hashtable.TrustChain++;
@@ -216,7 +216,7 @@ int VerifyIVFCLevels(void)
 			}
 			
 			u8 ActualHash[0x20];
-			ctr_sha_256(DataToHash,blocksize,ActualHash);			
+			ctr_sha(DataToHash,blocksize,ActualHash,CTR_SHA_256);			
 						
 			// Storing result
 			if(memcmp(EmptyHash,ExpectedHash,0x20) != 0){
@@ -396,7 +396,7 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 		}
 		memset(IVFC_Block,0,blocksize);
 		u8 EmptyBlockHash[0x20];
-		ctr_sha_256(IVFC_Block,blocksize,EmptyBlockHash);	
+		ctr_sha(IVFC_Block,blocksize,EmptyBlockHash,CTR_SHA_256);	
 		
 				
 		// Checking each block in current IVFC level
@@ -417,7 +417,7 @@ int GenerateIVFCHashTree(CreateExtdataCTX *ctx, u8 *outbuff)
 			u8 *WriteHashOffset = outbuff + prev_offset + (j*0x20);
 			if(i==level1) WriteHashOffset = ctx->IVFC_MASTER_HASH.buffer + (j*0x20);
 			
-			ctr_sha_256(BlockLocation,blocksize,WriteHashOffset);
+			ctr_sha(BlockLocation,blocksize,WriteHashOffset,CTR_SHA_256);
 			if(memcmp(WriteHashOffset,EmptyBlockHash,0x20) == 0) memset(WriteHashOffset,0,0x20);
 		}
 		
@@ -441,7 +441,7 @@ int GenerateDIFIPartitions(CreateExtdataCTX *ctx, u8 *outbuff)
 		memcpy(outbuff+ctx->PARTITION_OFFSET[i]+sizeof(DIFI_PARTITION),ctx->IVFC_MASTER_HASH.buffer,ctx->IVFC_MASTER_HASH.size);
 	}
 	free(ctx->IVFC_MASTER_HASH.buffer);
-	ctr_sha_256(outbuff+ctx->PARTITION_OFFSET[ctx->ActiveDIFI],ctx->PARTITION_SIZE,ctx->ActiveDIFIHash);
+	ctr_sha(outbuff+ctx->PARTITION_OFFSET[ctx->ActiveDIFI],ctx->PARTITION_SIZE,ctx->ActiveDIFIHash,CTR_SHA_256);
 	
 	return 0;
 }

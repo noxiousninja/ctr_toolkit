@@ -34,7 +34,7 @@ int PrepAESMAC(AESMAC_CTX *ctx)
 		memcpy(finalblock.savegame_type,savegame_type[CTR_9DB0],8);
 		u32_to_u8(finalblock.db_id,0x3,LE);
 		memcpy(finalblock.diff_header,ctx->header,0x100);
-		ctr_sha_256(&finalblock,sizeof(db_sha256_block),ctx->hash);
+		ctr_sha(&finalblock,sizeof(db_sha256_block),ctx->hash,CTR_SHA_256);
 	}
 	else if(ctx->type == mac_title_db){
 		db_sha256_block finalblock;
@@ -42,7 +42,7 @@ int PrepAESMAC(AESMAC_CTX *ctx)
 		memcpy(finalblock.savegame_type,savegame_type[CTR_9DB0],8);
 		u32_to_u8(finalblock.db_id,0x2,LE);
 		memcpy(finalblock.diff_header,ctx->header,0x100);
-		ctr_sha_256(&finalblock,sizeof(db_sha256_block),ctx->hash);
+		ctr_sha(&finalblock,sizeof(db_sha256_block),ctx->hash,CTR_SHA_256);
 	}
 	else if(ctx->type == mac_extdata){
 		extdata_sha256_block finalblock;
@@ -54,7 +54,7 @@ int PrepAESMAC(AESMAC_CTX *ctx)
 		endian_memcpy(finalblock.image_id_dup,ctx->image_id,4,LE);
 		endian_memcpy(finalblock.subdir_id_dup,ctx->subdir_id,4,LE);
 		memcpy(finalblock.diff_header,ctx->header,0x100);
-		ctr_sha_256(&finalblock,sizeof(extdata_sha256_block),ctx->hash);
+		ctr_sha(&finalblock,sizeof(extdata_sha256_block),ctx->hash,CTR_SHA_256);
 	}
 	else if(ctx->type == mac_sys_save){
 		sys_savedata_sha256_block finalblock;
@@ -62,7 +62,7 @@ int PrepAESMAC(AESMAC_CTX *ctx)
 		memcpy(finalblock.savegame_type,savegame_type[CTR_SYS0],8);
 		endian_memcpy(finalblock.save_id,ctx->saveid,8,LE);
 		memcpy(finalblock.disa_header,ctx->header,0x100);
-		ctr_sha_256(&finalblock,sizeof(sys_savedata_sha256_block),ctx->hash);
+		ctr_sha(&finalblock,sizeof(sys_savedata_sha256_block),ctx->hash,CTR_SHA_256);
 	}
 	else if(ctx->type == mac_sd_save){
 		sdcard_savegame_sha256_block finalblock;
@@ -74,9 +74,9 @@ int PrepAESMAC(AESMAC_CTX *ctx)
 		memset(&pre_block,0,sizeof(ctr_sav0_sha256_block));
 		memcpy(pre_block.savegame_type,savegame_type[CTR_SAV0],8);
 		memcpy(pre_block.disa_header,ctx->header,0x100);
-		ctr_sha_256(&pre_block,sizeof(ctr_sav0_sha256_block),finalblock.ctr_sav0_block_hash);
+		ctr_sha(&pre_block,sizeof(ctr_sav0_sha256_block),finalblock.ctr_sav0_block_hash,CTR_SHA_256);
 		//
-		ctr_sha_256(&finalblock,sizeof(sdcard_savegame_sha256_block),ctx->hash);
+		ctr_sha(&finalblock,sizeof(sdcard_savegame_sha256_block),ctx->hash,CTR_SHA_256);
 	}
 	else if(ctx->type == mac_card_save){
 		gamecard_savegame_sha256_block finalblock;
@@ -87,9 +87,9 @@ int PrepAESMAC(AESMAC_CTX *ctx)
 		memset(&pre_block,0,sizeof(ctr_nor0_sha256_block));
 		memcpy(pre_block.savegame_type,savegame_type[CTR_NOR0],8);
 		memcpy(pre_block.disa_header,ctx->header,0x100);
-		ctr_sha_256(&pre_block,sizeof(ctr_nor0_sha256_block),finalblock.ctr_nor0_block_hash);
+		ctr_sha(&pre_block,sizeof(ctr_nor0_sha256_block),finalblock.ctr_nor0_block_hash,CTR_SHA_256);
 		//
-		ctr_sha_256(&finalblock,sizeof(gamecard_savegame_sha256_block),ctx->hash);
+		ctr_sha(&finalblock,sizeof(gamecard_savegame_sha256_block),ctx->hash,CTR_SHA_256);
 	}
 	else
 		return Fail;

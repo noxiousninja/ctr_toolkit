@@ -38,35 +38,5 @@ along with extdata_tool.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #define ARG_ERROR 1
-#define IO_FAIL 2
+#define IO_ERROR 2
 #define MEM_ERROR 3
-
-#ifndef _VARIABLES_
-#define _VARIABLES_
-typedef enum
-{
-	False = 0,
-	True = 1
-} _bool;
-
-typedef enum
-{
-	Good = 0,
-	Fail
-} success;
-
-typedef enum
-{
-	BIG_ENDIAN = 0,
-	LITTLE_ENDIAN = 1,
-	BE = 0,
-	LE = 1
-} endian_types;
-
-
-typedef enum
-{
-	Invalid = -1,
-	Valid = 0
-}Validity;
-#endif

@@ -28,7 +28,7 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 typedef enum
 {
 	MAJOR = 2,
-	MINOR = 2
+	MINOR = 3
 } app_version;
 
 typedef enum
@@ -134,7 +134,7 @@ int main(int argc, char *argv[])
 		if(fp == NULL){
 			printf("[!] Failed to open '%s'\n",input);
 			FreeExtdataContext(extdata);
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		fclose(fp);
 		extdata->extdata.size = GetFileSize_u64(input);
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
 				if(fp == NULL){
 					printf("[!] Failed to create '%s'\n",output);
 					FreeExtdataContext(extdata);
-					return IO_FAIL;
+					return IO_ERROR;
 				}
 				if(extdata->Verbose) printf("[+] Writing data to '%s'\n",output);
 				WriteBuffer(embedded_data,extdata->Files.Data[0].size,0,fp);
@@ -204,7 +204,7 @@ int main(int argc, char *argv[])
 		
 		if(getcwdir(cwd,IO_PATH_LEN) == NULL){
 			printf("[!] Could not store Current Working Directory\n");
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		
 		
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
 			else if(strncmp(argv[i],"--FSdir=",8) == 0 && input == NULL){
 				input = (char*)(argv[i]+8);
 			}
-			else if(strcmp(argv[i],"-f") == 0 && output == NULL && i < argc-1){
+			else if(strcmp(argv[i],"-x") == 0 && output == NULL && i < argc-1){
 				vsxe_ctx->Flags[vsxe_extract] = True;
 				output = argv[i+1];
 			}
@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
 			else if(strcmp(argv[i],"-v") == 0 || strcmp(argv[i],"--verbose") == 0){
 				vsxe_ctx->Flags[vsxe_verbose] = True;
 			}
-			else if(strcmp(argv[i],"-r") == 0 || strcmp(argv[i],"--FStable") == 0){
+			else if(strcmp(argv[i],"-f") == 0 || strcmp(argv[i],"--FStable") == 0){
 				vsxe_ctx->Flags[vsxe_fstable] = True;
 			}
 			else if(strcmp(argv[i],"-a") == 0 && i < argc-1){
@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
 			free(vsxe_ctx->input);
 			free(vsxe_ctx);
 			FreeExtdataContext(vsxe);
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		chdir(cwd);
 		
@@ -303,7 +303,7 @@ int main(int argc, char *argv[])
 			free(vsxe_ctx->output);
 			free(vsxe_ctx);
 			FreeExtdataContext(vsxe);
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		chdir(cwd);
 		
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
 			free(vsxe_ctx->output);
 			free(vsxe_ctx);
 			FreeExtdataContext(vsxe);
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		
 		fclose(fp);
@@ -553,14 +553,14 @@ int main(int argc, char *argv[])
 		if(outfile == NULL){
 			printf("[!] Failed to create '%s'\n",output);
 			free(aes_ctx);
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		FILE *infile = fopen(input,"rb");
 		if(infile == NULL){
 			printf("[!] Failed to open '%s'\n",input);
 			free(aes_ctx);
 			free(sourcedata.buffer);
-			return IO_FAIL;
+			return IO_ERROR;
 		}
 		fclose(infile);
 		sourcedata.size = GetFileSize_u64(input);
@@ -616,9 +616,9 @@ void help(char *app_name)
 	printf(" -v, --verbose                                Enable verbose output.\n");
 	printf("Extdata (VSXE) File System Options:\n");
 	printf(" -d, --FSdir=           Dir-in                Specify Extdata FS Directory\n");
-	printf(" -f, --extractFS=       Dir-out               Extract VSXE File System\n");
+	printf(" -x, --extractFS=       Dir-out               Extract VSXE File System\n");
 	printf(" -s, --showFS                                 Display VSXE Extdata Mount Points\n");
-	printf(" -r, --FSTable                                Display VSXE Folder and File Tables\n");
+	printf(" -f, --FStable                                Display VSXE Folder and File Tables\n");
 	printf("Extdata Title Database (BDRI) Options:\n");
 	printf(" -l, --listDB                                 List the Titles in DB\n");
 	printf(" -0, --listTID                                List the Title IDs of the titles in DB\n");

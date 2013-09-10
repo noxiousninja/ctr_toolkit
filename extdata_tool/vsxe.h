@@ -146,5 +146,3 @@ typedef struct
 // Prototypes
 int ProcessExtData_FS(VSXEContext *ctx);
 int IsVSXEFileSystem(u8 *vsxe);
-
-//void read_vsxe(FILE *file, u32 offset);
