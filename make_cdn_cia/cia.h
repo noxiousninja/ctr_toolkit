@@ -30,8 +30,7 @@ typedef struct
 {
 	u8 modulus[0x100];
 	u8 exponent[0x4];
-} __attribute__((__packed__))
-RSA_2048_PUB_KEY;
+} RSA_2048_PUB_KEY;
 
 typedef struct
 {
@@ -42,8 +41,7 @@ typedef struct
 	u8 tag_1[0x4];
 	RSA_2048_PUB_KEY pubk;
 	u8 padding_1[0x34];
-} __attribute__((__packed__))
-CERT_2048KEY_DATA_STRUCT;
+} CERT_2048KEY_DATA_STRUCT;
 
 typedef struct
 {
@@ -53,8 +51,7 @@ typedef struct
 	u8 ca_crl_version;
 	u8 signer_crl_version;
 	u8 padding_1;
-} __attribute__((__packed__))
-TMD_SIG_STRUCT;
+} TMD_SIG_STRUCT;
 
 typedef struct
 {
@@ -63,8 +60,7 @@ typedef struct
 	u8 content_type[2];
 	u8 content_size[8];
 	u8 sha_256_hash[0x20];
-} __attribute__((__packed__))
-TMD_CONTENT_CHUNK_STRUCT;
+} TMD_CONTENT_CHUNK_STRUCT;
 
 typedef struct
 {
@@ -80,8 +76,7 @@ typedef struct
 	u8 padding[2];
 	u8 sha_256_hash[0x20];
 	u8 content_info_records[0x900];
-} __attribute__((__packed__)) 
-TMD_STRUCT;
+} TMD_STRUCT;
 
 typedef struct
 {
@@ -89,8 +84,7 @@ typedef struct
 	u8 issuer[0x40];
 	u8 ECDH[0x3c];
 	u8 unknown[3];
-} __attribute__((__packed__))
-TIK_SIG_STRUCT;
+} TIK_SIG_STRUCT;
 
 typedef struct
 {
@@ -106,8 +100,7 @@ typedef struct
 	u8 unused_1;
 	u8 common_key_index;
 	u8 unknown_2[0x15e];
-} __attribute__((__packed__)) 
-TIK_STRUCT;
+} TIK_STRUCT;
 
 typedef struct
 {

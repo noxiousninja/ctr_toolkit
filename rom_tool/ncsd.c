@@ -101,21 +101,21 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	
 	u32 media_size = ((header.partition_flags[6] + 1)*0x200);
 	
-	u64 ROM_SIZE_MEDIAS = u8_to_u32(header.rom_size,LITTLE_ENDIAN);
+	u64 ROM_SIZE_MEDIAS = u8_to_u32(header.rom_size,LE);
 	ctx->ncsd_struct->rom_size = (ROM_SIZE_MEDIAS)*(media_size);
-	u32 tmp = u8_to_u32(header.offsetsize_table[0].offset,LITTLE_ENDIAN);
+	u32 tmp = u8_to_u32(header.offsetsize_table[0].offset,LE);
 	for(int i = 0; i < 8; i++){
-		tmp += u8_to_u32(header.offsetsize_table[i].size,LITTLE_ENDIAN);
+		tmp += u8_to_u32(header.offsetsize_table[i].size,LE);
 	}
 	ctx->ncsd_struct->used_rom_size = tmp*media_size;
 		
 	
 	for(int i = 0; i < 8; i++){
-		ctx->ncsd_struct->partition_data[i].offset = u8_to_u32(header.offsetsize_table[i].offset,LITTLE_ENDIAN)*media_size;
-		ctx->ncsd_struct->partition_data[i].size = u8_to_u32(header.offsetsize_table[i].size,LITTLE_ENDIAN)*media_size;
+		ctx->ncsd_struct->partition_data[i].offset = u8_to_u32(header.offsetsize_table[i].offset,LE)*media_size;
+		ctx->ncsd_struct->partition_data[i].size = u8_to_u32(header.offsetsize_table[i].size,LE)*media_size;
 		if(ctx->ncsd_struct->partition_data[i].offset != 0 && ctx->ncsd_struct->partition_data[i].size != 0)
 			ctx->ncsd_struct->partition_data[i].active = True;
-		ctx->ncsd_struct->partition_data[i].title_id = u8_to_u64(header.partition_id_table[i],LITTLE_ENDIAN);
+		ctx->ncsd_struct->partition_data[i].title_id = u8_to_u64(header.partition_id_table[i],LE);
 		ctx->ncsd_struct->partition_data[i].fs_type = header.partitions_fs_type[i];
 		ctx->ncsd_struct->partition_data[i].crypto_type = header.partitions_crypto_type[i];
 		
@@ -153,7 +153,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	memset(zeros,0,0x30);
 	if(memcmp(&header.reserved,zeros,0x30) != 0)
 		ctx->ncsd_struct->type = nand;
-	else if(u8_to_u64(card_info.cver_title_id,LITTLE_ENDIAN) == 0){
+	else if(u8_to_u64(card_info.cver_title_id,LE) == 0){
 		u8 stock_title_key[0x10] = {0x6E, 0xC7, 0x5F, 0xB2, 0xE2, 0xB4, 0x87, 0x46, 0x1E, 0xDD, 0xCB, 0xB8, 0x97, 0x11, 0x92, 0xBA};
 		if(memcmp(dev_card_info.TitleKey,stock_title_key,0x10) == 0)
 			ctx->ncsd_struct->type = dev_external_SDK;
@@ -223,8 +223,8 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 	switch(ctx->type){
 		case retail : 
 			printf("NCSD Type:              Retail/Production\n"); 
-			printf("CVer Title ID:          %016llx\n",u8_to_u64(card_info->cver_title_id,LITTLE_ENDIAN));
-			printf("CVer Title Ver:         v%d\n",u8_to_u16(card_info->cver_title_version,LITTLE_ENDIAN));
+			printf("CVer Title ID:          %016llx\n",u8_to_u64(card_info->cver_title_id,LE));
+			printf("CVer Title Ver:         v%d\n",u8_to_u16(card_info->cver_title_version,LE));
 			char FW_STRING[10];
 			GetMin3DSFW((char*)FW_STRING,card_info);
 			printf("Min 3DS Firm:           %s\n",FW_STRING);
@@ -250,12 +250,12 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 	//printf("%s\n",actual_size_string);
 	
 	if(ctx->type != nand){
-		printf("NCSD Title ID:          %016llx\n",u8_to_u64(header->title_id,LITTLE_ENDIAN));
+		printf("NCSD Title ID:          %016llx\n",u8_to_u64(header->title_id,LE));
 		memdump(stdout,"ExHeader Hash:          ",header->exheader_hash,0x20);
-		printf("AddHeader Size:         0x%x\n",u8_to_u32(header->additional_header_size,LITTLE_ENDIAN));
+		printf("AddHeader Size:         0x%x\n",u8_to_u32(header->additional_header_size,LE));
 	}
 	else{
-		printf("Sector 0 Offset:        0x%x\n",u8_to_u32(header->sector_zero_offset,LITTLE_ENDIAN));
+		printf("Sector 0 Offset:        0x%x\n",u8_to_u32(header->sector_zero_offset,LE));
 	}
 	memdump(stdout,"Flags:                  ",header->partition_flags,8);
 	printf("\n");

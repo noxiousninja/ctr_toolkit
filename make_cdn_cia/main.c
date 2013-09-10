@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 		return FILE_PROCESS_FAIL;
 	}
 	//TID comparison check
-	if(check_tid(tik_context.title_id,tmd_context.title_id) != TRUE){
+	if(check_tid(tik_context.title_id,tmd_context.title_id) != True){
 		printf("[!] Caution, Ticket and TMD Title IDs do not match\n");
 		printf("[!] CETK Title ID:  "); u8_hex_print_be(tik_context.title_id,0x8); printf("\n");
 		printf("[!] TMD Title ID:   "); u8_hex_print_be(tmd_context.title_id,0x8); printf("\n");
