@@ -126,7 +126,7 @@ int VerifyNCCH(USER_CONTEXT *ctx, u32 offset, FILE *ncch)
 {
 	NCCH_STRUCT *cxi_ctx = malloc(sizeof(NCCH_STRUCT));
 	if(cxi_ctx == NULL){
-		printf("[!] Failed to allocate memory (0x%x bytes) for CXI Context\n",sizeof(NCCH_STRUCT));
+		printf("[!] Failed to allocate memory (0x%lx bytes) for CXI Context\n",sizeof(NCCH_STRUCT));
 		return 1; 
 	}
 	memset(cxi_ctx,0x0,sizeof(NCCH_STRUCT));
