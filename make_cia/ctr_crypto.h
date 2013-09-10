@@ -19,6 +19,7 @@ along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef _CTR_CRYPTO_H_
 #define _CTR_CRYPTO_H_
 
+#include "polarssl/config.h"
 #include "polarssl/aes.h"
 #include "polarssl/rsa.h"
 #include "polarssl/sha1.h"
@@ -38,7 +39,8 @@ typedef enum
 {
 	RSA_2048 = 0,
 	RSA_4096 = 1,
-} ctr_rsa_types;
+	ECC = 2,
+} ctr_sig_types;
 
 typedef enum
 {
@@ -133,6 +135,9 @@ int ctr_rsa_rsassa_pkcs1_v15_sign( rsa_context *ctx,
                                const unsigned char *hash,
                                unsigned char *sig );
 
+// Signature Functions
+int ctr_sig(void *data, u64 size, u8 *signature, u8 *modulus, u8 *private_exp, u32 type, u8 mode);
+							   
 #ifdef __cplusplus
 }
 #endif

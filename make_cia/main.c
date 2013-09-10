@@ -27,7 +27,7 @@ along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 typedef enum
 {
 	MAJOR = 6,
-	MINOR = 3
+	MINOR = 4
 } AppVer;
 
 void app_title(void);

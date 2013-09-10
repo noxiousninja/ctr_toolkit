@@ -193,6 +193,57 @@ clean:
 	return Fail;
 }
 
+int ctr_sig(void *data, u64 size, u8 *signature, u8 *modulus, u8 *private_exp, u32 type, u8 mode)
+{
+	u8 result = 0;
+	int hashtype, hashlen, sigtype;
+	if(data == NULL || signature == NULL || modulus == NULL ||(private_exp == NULL && mode == CTR_RSA_SIGN))
+		return Fail;
+		
+	switch(type){
+		case RSA_4096_SHA1:
+			hashtype = CTR_SHA_1;
+			hashlen = 0x14;
+			sigtype = RSA_4096;
+		case RSA_4096_SHA256:
+			hashtype = CTR_SHA_256;
+			hashlen = 0x20;
+			sigtype = RSA_4096;
+			break;
+		case RSA_2048_SHA1:
+			hashtype = CTR_SHA_1;
+			hashlen = 0x14;
+			sigtype = RSA_2048;
+		case RSA_2048_SHA256:
+			hashtype = CTR_SHA_256;
+			hashlen = 0x20;
+			sigtype = RSA_2048;
+			break;
+		case ECC_SHA1:
+			hashtype = CTR_SHA_1;
+			hashlen = 0x14;
+			sigtype = ECC;
+		case ECC_SHA256:
+			hashtype = CTR_SHA_256;
+			hashlen = 0x20;
+			sigtype = ECC;
+			break;
+		default: return Fail;
+	}
+	
+	u8 hash[hashlen];
+	memset(hash,0,hashlen);
+	ctr_sha(data,size,hash,hashtype);
+	
+	if(sigtype == RSA_2048 || sigtype == RSA_4096)
+		result = ctr_rsa(hash,signature,modulus,private_exp,type,mode);
+	else if(sigtype == ECC){
+		printf("[!] ECC is not yet implemented\n");
+		result = Fail;
+	}
+	return result;
+}
+
 int ctr_rsa(u8 *hash, u8 *signature, u8 *modulus, u8 *private_exp, u32 type, u8 mode)
 {
 	u8 result = 0;
@@ -205,25 +256,27 @@ int ctr_rsa(u8 *hash, u8 *signature, u8 *modulus, u8 *private_exp, u32 type, u8 
 	int hashlen;
 	int sigtype;
 	switch(type){
-		case RSA_4096_SHA1:
-			hashtype = SIG_RSA_SHA1;
-			hashlen = 0x14;
-			sigtype = RSA_4096;
-		case RSA_4096_SHA256:
-			hashtype = SIG_RSA_SHA256;
-			hashlen = 0x14;
-			sigtype = RSA_4096;
-			break;
-		case RSA_2048_SHA1:
-			hashtype = SIG_RSA_SHA1;
-			hashlen = 0x20;
-			sigtype = RSA_2048;
-		case RSA_2048_SHA256:
-			hashtype = SIG_RSA_SHA256;
-			hashlen = 0x20;
-			sigtype = RSA_2048;
-			break;
-		default: return Fail;
+			case RSA_4096_SHA1:
+				hashtype = SIG_RSA_SHA1;
+				hashlen = 0x14;
+				sigtype = RSA_4096;
+				break;
+			case RSA_4096_SHA256:
+				hashtype = SIG_RSA_SHA256;
+				hashlen = 0x14;
+				sigtype = RSA_4096;
+				break;
+			case RSA_2048_SHA1:
+				hashtype = SIG_RSA_SHA1;
+				hashlen = 0x20;
+				sigtype = RSA_2048;
+				break;
+			case RSA_2048_SHA256:
+				hashtype = SIG_RSA_SHA256;
+				hashlen = 0x20;
+				sigtype = RSA_2048;
+				break;
+			default: return Fail;
 	}
 	
 	// Setting up

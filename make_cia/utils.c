@@ -34,18 +34,6 @@ void char_to_int_array(unsigned char destination[], char source[], int size, int
         byte_array[i] = (unsigned char)strtol(tmp[i], NULL, base);
     }
 	endian_memcpy(destination,byte_array,size,endianness);
-	/**
-	for (int i = 0; i < size; i++){
-        switch (endianness){
-        	case(BIG_ENDIAN):
-        	destination[i] = byte_array[i];
-        	break;
-        	case(LITTLE_ENDIAN):
-        	destination[i] = byte_array[((size-1)-i)];
-        	break;
-        }
-    }
-	**/
 	_free(byte_array);
 }
 
@@ -53,10 +41,10 @@ void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness)
 { 
     for (u32 i = 0; i < size; i++){
         switch (endianness){
-            case(BIG_ENDIAN):
+            case(BE):
                 destination[i] = source[i];
                 break;
-            case(LITTLE_ENDIAN):
+            case(LE):
                 destination[i] = source[((size-1)-i)];
                 break;
         }
@@ -242,8 +230,8 @@ u16 u8_to_u16(u8 *value, u8 endianness)
 {
 	u16 new_value;
 	switch(endianness){
-		case(BIG_ENDIAN): new_value =  (value[1]<<0) | (value[0]<<8); break;
-		case(LITTLE_ENDIAN): new_value = (value[0]<<0) | (value[1]<<8); break;
+		case(BE): new_value =  (value[1]<<0) | (value[0]<<8); break;
+		case(LE): new_value = (value[0]<<0) | (value[1]<<8); break;
 	}
 	return new_value;
 }
@@ -252,8 +240,8 @@ u32 u8_to_u32(u8 *value, u8 endianness)
 {
 	u32 new_value;
 	switch(endianness){
-		case(BIG_ENDIAN): new_value = (value[3]<<0) | (value[2]<<8) | (value[1]<<16) | (value[0]<<24); break;
-		case(LITTLE_ENDIAN): new_value = (value[0]<<0) | (value[1]<<8) | (value[2]<<16) | (value[3]<<24); break;
+		case(BE): new_value = (value[3]<<0) | (value[2]<<8) | (value[1]<<16) | (value[0]<<24); break;
+		case(LE): new_value = (value[0]<<0) | (value[1]<<8) | (value[2]<<16) | (value[3]<<24); break;
 	}
 	return new_value;
 }
@@ -263,7 +251,7 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 {
 	u64 u64_return = 0;
 	switch(endianness){
-		case(BIG_ENDIAN): 
+		case(BE): 
 			u64_return |= (u64)value[7]<<0;
 			u64_return |= (u64)value[6]<<8;
 			u64_return |= (u64)value[5]<<16;
@@ -274,7 +262,7 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 			u64_return |= (u64)value[0]<<56;
 			break;
 			//return (value[7]<<0) | (value[6]<<8) | (value[5]<<16) | (value[4]<<24) | (value[3]<<32) | (value[2]<<40) | (value[1]<<48) | (value[0]<<56);
-		case(LITTLE_ENDIAN): 
+		case(LE): 
 			u64_return |= (u64)value[0]<<0;
 			u64_return |= (u64)value[1]<<8;
 			u64_return |= (u64)value[2]<<16;
@@ -292,11 +280,11 @@ u64 u8_to_u64(u8 *value, u8 endianness)
 int u16_to_u8(u8 *out_value, u16 in_value, u8 endianness)
 {
 	switch(endianness){
-		case(BIG_ENDIAN):
+		case(BE):
 			out_value[0]=(in_value >> 8);
 			out_value[1]=(in_value >> 0);
 			break;
-		case(LITTLE_ENDIAN):
+		case(LE):
 			out_value[0]=(in_value >> 0);
 			out_value[1]=(in_value >> 8);
 			break;
@@ -307,13 +295,13 @@ int u16_to_u8(u8 *out_value, u16 in_value, u8 endianness)
 int u32_to_u8(u8 *out_value, u32 in_value, u8 endianness)
 {
 	switch(endianness){
-		case(BIG_ENDIAN):
+		case(BE):
 			out_value[0]=(in_value >> 24);
 			out_value[1]=(in_value >> 16);
 			out_value[2]=(in_value >> 8);
 			out_value[3]=(in_value >> 0);
 			break;
-		case(LITTLE_ENDIAN):
+		case(LE):
 			out_value[0]=(in_value >> 0);
 			out_value[1]=(in_value >> 8);
 			out_value[2]=(in_value >> 16);
@@ -326,7 +314,7 @@ int u32_to_u8(u8 *out_value, u32 in_value, u8 endianness)
 int u64_to_u8(u8 *out_value, u64 in_value, u8 endianness)
 {
 	switch(endianness){
-		case(BIG_ENDIAN):
+		case(BE):
 			out_value[0]=(in_value >> 56);
 			out_value[1]=(in_value >> 48);
 			out_value[2]=(in_value >> 40);
@@ -336,7 +324,7 @@ int u64_to_u8(u8 *out_value, u64 in_value, u8 endianness)
 			out_value[6]=(in_value >> 8);
 			out_value[7]=(in_value >> 0);
 			break;
-		case(LITTLE_ENDIAN):
+		case(LE):
 			out_value[0]=(in_value >> 0);
 			out_value[1]=(in_value >> 8);
 			out_value[2]=(in_value >> 16);

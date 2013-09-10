@@ -1,7 +1,11 @@
 CTR_Toolkit - make_cia - Generates CIA files
-Version: 6.3 2013 (C) 3DSGuy
+Version: 6.4 2013 (C) 3DSGuy
 
 /******** Change Log ********/
+
+Version 6.4:
+* Allowances have been made for ECC signature handling, when it becomes part of polarssl
+* Can now be compiled on Mac OS X
 
 Version 6.3:
 * Polarssl library updated, and more modules included (SHA1 being a noteworthy inclusion)

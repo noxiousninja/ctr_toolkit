@@ -85,14 +85,14 @@ int SetupCIAHeader(USER_CONTEXT *ctx)
 	
 	CIA_HEADER cia_header;
 	memset(&cia_header,0x0,sizeof(cia_header));
-	u32_to_u8(cia_header.header_size,sizeof(cia_header),LITTLE_ENDIAN);
-	u16_to_u8(cia_header.type,0x0,LITTLE_ENDIAN);
-	u16_to_u8(cia_header.version,0x0,LITTLE_ENDIAN);
-	u32_to_u8(cia_header.cert_size,ctx->cia_section[certchain].size,LITTLE_ENDIAN);
-	u32_to_u8(cia_header.tik_size,ctx->cia_section[tik].size,LITTLE_ENDIAN);
-	u32_to_u8(cia_header.tmd_size,ctx->cia_section[tmd].size,LITTLE_ENDIAN);
-	u32_to_u8(cia_header.meta_size,ctx->cia_section[meta].size,LITTLE_ENDIAN);
-	u64_to_u8(cia_header.content_size,ctx->cia_section[content].size,LITTLE_ENDIAN);
+	u32_to_u8(cia_header.header_size,sizeof(cia_header),LE);
+	u16_to_u8(cia_header.type,0x0,LE);
+	u16_to_u8(cia_header.version,0x0,LE);
+	u32_to_u8(cia_header.cert_size,ctx->cia_section[certchain].size,LE);
+	u32_to_u8(cia_header.tik_size,ctx->cia_section[tik].size,LE);
+	u32_to_u8(cia_header.tmd_size,ctx->cia_section[tmd].size,LE);
+	u32_to_u8(cia_header.meta_size,ctx->cia_section[meta].size,LE);
+	u64_to_u8(cia_header.content_size,ctx->cia_section[content].size,LE);
 	
 	// SetCIAContentIndex, actually works for all index values now. CIA files generated can now hold, with
 	// validity, 65536 contents. Or at least have a content with index value of 65535
