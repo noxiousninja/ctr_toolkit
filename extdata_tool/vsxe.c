@@ -149,13 +149,28 @@ void VSXE_PrintFSInfo(void)
 	if(vsxe_ctx.showfs_tables){
 		printf("\nFolders\n");
 		for(int i = 1; i < vsxe_ctx.foldercount; i++){
+			u32 ParentFolderIndex = u8_to_u32(vsxe_ctx.folders[i].parent_folder_index,LE);
+			u32 LastFolderIndex = u8_to_u32(vsxe_ctx.folders[i].last_folder_index,LE);
+			u32 LastFileIndex = u8_to_u32(vsxe_ctx.folders[i].last_file_index,LE);
 			printf("------------------------------------\n\n");
 			printf("Current Folder Index:  %d\n",i);
-			printf("Parent Folder Index:   %d\n",u8_to_u32(vsxe_ctx.folders[i].parent_folder_index,LE));
+			if(ParentFolderIndex > 1)
+				printf("Parent Folder Index:   %d (%s)\n",ParentFolderIndex,vsxe_ctx.folders[ParentFolderIndex].filename);
+			else if(ParentFolderIndex == 1)
+				printf("Parent Folder Index:   %d (root)\n",ParentFolderIndex);
+			else
+				printf("Parent Folder Index:   %d\n",ParentFolderIndex);
 			printf("Folder Name:           %s\n",vsxe_ctx.folders[i].filename);
 			printf("UNK0:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk0,LE));
-			printf("Last Folder Index:     %d\n",u8_to_u32(vsxe_ctx.folders[i].last_folder_index,LE));
-			printf("Last File Index:       %d\n",u8_to_u32(vsxe_ctx.folders[i].last_file_index,LE));
+			if(LastFolderIndex)
+				printf("Last Folder Index:     %d (%s)\n",LastFolderIndex,vsxe_ctx.folders[LastFolderIndex].filename);
+			else
+				printf("Last Folder Index:     %d\n",LastFolderIndex);
+			if(LastFileIndex)
+				printf("Last File Index:       %d (%s)\n",LastFileIndex,vsxe_ctx.files[LastFileIndex].filename);
+			else
+				printf("Last File Index:       %d\n",LastFileIndex);
+				
 			printf("UNK2:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk1,LE));
 			printf("UNK3:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk2,LE));
 			printf("\n------------------------------------\n");
@@ -163,9 +178,13 @@ void VSXE_PrintFSInfo(void)
 		
 		printf("\nFiles\n");
 		for(int i = 1; i < vsxe_ctx.filecount; i++){
+			u32 ParentFolderIndex = u8_to_u32(vsxe_ctx.files[i].parent_folder_index,LE);
 			printf("------------------------------------\n\n");
 			printf("Current File Index:    %d\n",i);
-			printf("Parent Folder Index:   %d\n",u8_to_u32(vsxe_ctx.files[i].parent_folder_index,LE));
+			if(ParentFolderIndex == 1)
+				printf("Parent Folder Index:   %d (root)\n",ParentFolderIndex);
+			else
+				printf("Parent Folder Index:   %d (%s)\n",ParentFolderIndex,vsxe_ctx.folders[ParentFolderIndex].filename);
 			printf("File Name:             %s\n",vsxe_ctx.files[i].filename);
 			printf("UNK0:                  %d\n",u8_to_u32(vsxe_ctx.files[i].unk0,LE));
 			printf("UNK1:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk1,LE));
@@ -268,26 +287,28 @@ int VSXE_ExportExtdataImagetoFile(char *inpath, char *outpath, u8 *ExtdataUnique
 void VSXE_ReturnDirPath(u32 folder_id, char *path, u8 platform)
 {
 	// Counting Number of directories to root directory
-	u8 path_part_count = 0;
-	u8 present_dir = u8_to_u32(vsxe_ctx.folders[folder_id].parent_folder_index,LE);
+	u32 path_part_count = 0;
+	u32 present_dir = u8_to_u32(vsxe_ctx.folders[folder_id].parent_folder_index,LE);
 	while(present_dir > 1){
 		path_part_count++;
 		present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
 	}
 	
 	// Storing the folder entry indexes to root
-	u8 folderlocation[path_part_count];
+	u32 folderlocation[path_part_count];
 	present_dir = u8_to_u32(vsxe_ctx.folders[folder_id].parent_folder_index,LE);
-	folderlocation[path_part_count - 1] = present_dir;
-	for(u32 i = path_part_count - 2 ; present_dir > 0; i--){
-		present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
+	for(u32 i = path_part_count; present_dir > 0; i--){
+		if(i!=path_part_count)
+			present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
 		folderlocation[i] = present_dir;
+		if(!i)
+			break;
 	}
 	
 	sprintf(path,"%s%c",path,platform);
 	
 	// Adding each directory to the path
-	for(u32 i = 0; i < path_part_count; i++){
+	for(u32 i = 1; i < path_part_count; i++){
 		u8 folder_id = folderlocation[i];	
 		sprintf(path,"%s%s%c",path,vsxe_ctx.folders[folder_id].filename,platform);
 	}
@@ -297,30 +318,37 @@ void VSXE_ReturnDirPath(u32 folder_id, char *path, u8 platform)
 void VSXE_ReturnExtdataMountPath(u32 file_id, char *path, u8 platform)
 {
 	// Counting Number of directories to root directory
-	u8 path_part_count = 0;
-	u8 present_dir = u8_to_u32(vsxe_ctx.files[file_id].parent_folder_index,LE);
+	u32 path_part_count = 0;
+	u32 present_dir = u8_to_u32(vsxe_ctx.files[file_id].parent_folder_index,LE);
 	while(present_dir > 1){
 		path_part_count++;
 		present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
 	}
 	
 	// Storing the folder entry indexes to root
-	u8 folderlocation[path_part_count];
+	u32 folderlocation[path_part_count];
 	present_dir = u8_to_u32(vsxe_ctx.files[file_id].parent_folder_index,LE);
-	folderlocation[path_part_count - 1] = present_dir;
-	for(u32 i = path_part_count - 2 ; present_dir > 0; i--){
-		present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
+	for(u32 i = path_part_count; present_dir > 0; i--){
+		if(i!=path_part_count)
+			present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
 		folderlocation[i] = present_dir;
+		if(!i)
+			break;
 	}
 	
 	//sprintf(path,"%c",platform);
 	
+	
+	//printf("Init: (%s)\n",path);
+	
 	// Adding each directory to the path
-	for(u32 i = 0; i < path_part_count; i++){
-		u8 folder_id = folderlocation[i];	
+	for(u32 i = 1; i <= path_part_count; i++){
+		u8 folder_id = folderlocation[i];
 		sprintf(path,"%s%s%c",path,vsxe_ctx.folders[folder_id].filename,platform);
+		//printf("%4d: (%s)\n",i,path);
 	}
 	sprintf(path,"%s%s",path,vsxe_ctx.files[file_id].filename);	
+	//printf("Finl: (%s)\n",path);
 }
 
 void VSXE_InterpreteFolderTable(void)
