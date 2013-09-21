@@ -15,7 +15,8 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
-**/typedef enum
+**/
+typedef enum
 {
 	vsxe_magic = 0x56535845,
 	vsxe_magic_id = 0x30000
@@ -47,23 +48,23 @@ typedef struct
 {
 	u8 parent_folder_index[4];
     char filename[0x10];
-    u8 unk0[4];
+    u8 prev_folder_id[4];
     u8 last_folder_index[4]; 
     u8 last_file_index[4];
-    u8 unk1[4]; 
-    u8 unk2[4];
+    u8 unk0[4]; 
+    u8 unk1[4];
 } folder_entry;
 
 typedef struct
 {
 	u8 parent_folder_index[4];
     char filename[0x10];
-    u8 unk0[4];
-    u8 unk1[4]; 
-    u8 unk2[4];
+    u8 prev_file_id[4];
+    u8 unk0[4]; 
+    u8 unk1[4];
     u8 unique_extdata_id[8];
-    u8 unk3[4]; 
-    u8 unk4[4];
+    u8 unk2[4]; 
+    u8 unk3[4];
 } file_entry;
 
 typedef struct

@@ -28,7 +28,7 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 typedef enum
 {
 	MAJOR = 2,
-	MINOR = 3
+	MINOR = 4
 } app_version;
 
 typedef enum
@@ -617,7 +617,7 @@ void help(char *app_name)
 	printf("Extdata (VSXE) File System Options:\n");
 	printf(" -d, --FSdir=           Dir-in                Specify Extdata FS Directory\n");
 	printf(" -x, --extractFS=       Dir-out               Extract VSXE File System\n");
-	printf(" -s, --showFS                                 Display VSXE Extdata Mount Points\n");
+	printf(" -s, --showFS                                 Display VSXE Extdata FS w/ Mount Points\n");
 	printf(" -f, --FStable                                Display VSXE Folder and File Tables\n");
 	printf("Extdata Title Database (BDRI) Options:\n");
 	printf(" -l, --listDB                                 List the Titles in DB\n");

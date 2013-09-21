@@ -136,7 +136,7 @@ int GetExtdataContext(ExtdataContext *ctx)
 		printf(" > File Base Size:        0x%llx\n",ext_ctx.FileBaseSize);
 		memdump(stdout," > VSXE Extdata ID:       ",diff->extdata_unique_id,0x8);
 		printf("DIFI Partition Table\n");
-		if(ext_ctx.IsDATA) printf(" > DATA Offset:    0x%llx\n",ext_ctx.DataOffset+ext_ctx.FileBaseSize);
+		if(ext_ctx.IsDATA) printf(" > DATA Offset:    0x%llx\n",ext_ctx.DataOffset);
 		
 		printf(" > IVFC\n");
 		for(int i = 0; i < 4; i++){

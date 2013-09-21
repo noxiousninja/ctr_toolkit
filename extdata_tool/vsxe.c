@@ -23,15 +23,24 @@ along with extdata_tool. If not, see <http://www.gnu.org/licenses/>.
 static VSXE_INTERNAL_CONTEXT vsxe_ctx;
 
 // Private Prototypes
+// - Preparation Functions
 int VSXE_SetupInternalContext(VSXEContext *ctx);
-void VSXE_PrintFSInfo(void);
-void VSXE_SetupOutputFS(void);
-int VSXE_WriteExtdataFiles(void);
-int VSXE_ExportExtdataImagetoFile(char *inpath, char *outpath, u8 *ExtdataUniqueID);
-void VSXE_ReturnDirPath(u32 folder_id, char *path, u8 platform);
-void VSXE_ReturnExtdataMountPath(u32 file_id, char *path, u8 platform);
 void VSXE_InterpreteFolderTable(void);
 void VSXE_InterpreteFileTable(void);
+
+// - Info Functions
+void VSXE_PrintFSInfo(void);
+void VSXE_PrintDir(u32 dir, char *pre_string);
+void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string);
+u32 VSXE_GetDir_FileCount(u32 dir);
+u32 VSXE_GetDir_FolderCount(u32 dir);
+u32 VSXE_GetLevel(u32 dir);
+
+// - Extracting Functions
+int VSXE_Extract_FileSystem(u32 dir);
+int VSXE_ExportExtdataImagetoFile(char *inpath, FILE *out, u8 *ExtdataUniqueID);
+void VSXE_ReturnDirPath(u32 folder_id, char *path, u8 platform); // Retained, but not used
+void VSXE_ReturnExtdataMountPath(u32 file_id, char *path, u8 platform); // Retained, but not used
 
 // Code
 int IsVSXEFileSystem(u8 *vsxe)
@@ -55,8 +64,7 @@ int ProcessExtData_FS(VSXEContext *ctx)
 	VSXE_PrintFSInfo();
 	
 	if(ctx->Flags[vsxe_extract] == True){
-		VSXE_SetupOutputFS();
-		if(VSXE_WriteExtdataFiles() != 0){
+		if(VSXE_Extract_FileSystem(1) != 0){
 			printf("[!] Failed to Extract ExtData images\n");
 			return 1;
 		}
@@ -99,6 +107,32 @@ int VSXE_SetupInternalContext(VSXEContext *ctx)
 	return 0;
 }
 
+void VSXE_InterpreteFolderTable(void)
+{
+	folder_table_header *header = (folder_table_header*)(vsxe_ctx.vsxe + vsxe_ctx.folder_table_offset);
+	vsxe_ctx.foldercount = u8_to_u32(header->used_slots,LE);
+	vsxe_ctx.folders = (folder_entry*)(vsxe_ctx.vsxe + vsxe_ctx.folder_table_offset);
+
+	if(vsxe_ctx.verbose){
+		printf("[+] Maximum Folder Entries: %d\n",u8_to_u32(header->max_slots,LE)-1);
+		printf("[+] Used Folder Entries:    %d\n",u8_to_u32(header->used_slots,LE)-1);
+	}
+	return;
+}
+
+void VSXE_InterpreteFileTable(void)
+{
+	file_table_header *header = (file_table_header*)(vsxe_ctx.vsxe + vsxe_ctx.file_table_offset);
+	vsxe_ctx.filecount = u8_to_u32(header->used_slots,LE);
+	vsxe_ctx.files = (file_entry*)(vsxe_ctx.vsxe + vsxe_ctx.file_table_offset);
+
+	if(vsxe_ctx.verbose){
+		printf("[+] Maximum File Entries:   %d\n",u8_to_u32(header->max_slots,LE)-1);
+		printf("[+] Used File Entries:      %d\n",u8_to_u32(header->used_slots,LE)-1);
+	}
+	return;
+}
+
 void VSXE_PrintFSInfo(void)
 {
 	if(vsxe_ctx.showfs){
@@ -113,43 +147,15 @@ void VSXE_PrintFSInfo(void)
 		}
 		**/
 		
-		printf("ExtData Image Mount locations\n");
-		char *path = malloc(EXTDATA_FS_MAX_PATH_LEN);
-		for(u32 i = 1; i < vsxe_ctx.filecount; i++){
-			if(u8_to_u32(vsxe_ctx.files[i].unk2,LE)){
-				memset(path,0x0,EXTDATA_FS_MAX_PATH_LEN);
-				//sprintf(path,"root:/");
-				sprintf(path,"/");
-				VSXE_ReturnExtdataMountPath(i,path,UNIX);
-				printf(" Image %08x is mounted at: '%s'\n",i+1,path);
-			}
-			//else
-			//	printf(" Image %08x does not exist or isn't mounted\n",i+1);
-		}
-		/**
-		for(u32 i = 1; i < vsxe_ctx.foldercount; i++){
-			sprintf(path,"");
-			VSXE_ReturnDirPath(i,path,vsxe_ctx.platform);
-			printf("%s\n",path);
-		}
-		**/
-		
-		
-		free(path);
-		/**
-		printf("Data Table Info:\n");
-		for(int i = 1; i < 40; i += 4){
-			//printf("%03d : %08x %08x %08x %08x\n",i,u8_to_u32(ctx->header.table.unk0[i],LE));
-			for(int j = 0; j < 4; j++)
-				printf(" %08x",u8_to_u32(ctx->header.table.unk0[i+j],LE));
-			printf("\n");
-		}
-		**/
+		printf("ExtData FileSystem and Mount Locations:\n");
+		printf(" root\n");
+		VSXE_PrintDir(1," ");
 	}		
 	if(vsxe_ctx.showfs_tables){
 		printf("\nFolders\n");
 		for(int i = 1; i < vsxe_ctx.foldercount; i++){
 			u32 ParentFolderIndex = u8_to_u32(vsxe_ctx.folders[i].parent_folder_index,LE);
+			u32 PreviousFolderIndex = u8_to_u32(vsxe_ctx.folders[i].prev_folder_id,LE);
 			u32 LastFolderIndex = u8_to_u32(vsxe_ctx.folders[i].last_folder_index,LE);
 			u32 LastFileIndex = u8_to_u32(vsxe_ctx.folders[i].last_file_index,LE);
 			printf("------------------------------------\n\n");
@@ -161,7 +167,12 @@ void VSXE_PrintFSInfo(void)
 			else
 				printf("Parent Folder Index:   %d\n",ParentFolderIndex);
 			printf("Folder Name:           %s\n",vsxe_ctx.folders[i].filename);
-			printf("UNK0:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk0,LE));
+			if(PreviousFolderIndex < 1)
+				printf("Prev. Folder Index:    %d (Is First Folder in Dir)\n",PreviousFolderIndex);
+			else if(PreviousFolderIndex == 1)
+				printf("Prev. Folder Index:    %d (root)\n",PreviousFolderIndex);
+			else
+				printf("Prev. Folder Index:    %d (%s)\n",PreviousFolderIndex,vsxe_ctx.folders[PreviousFolderIndex].filename);
 			if(LastFolderIndex)
 				printf("Last Folder Index:     %d (%s)\n",LastFolderIndex,vsxe_ctx.folders[LastFolderIndex].filename);
 			else
@@ -171,14 +182,15 @@ void VSXE_PrintFSInfo(void)
 			else
 				printf("Last File Index:       %d\n",LastFileIndex);
 				
-			printf("UNK2:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk1,LE));
-			printf("UNK3:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk2,LE));
+			printf("UNK0:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk0,LE));
+			printf("UNK1:                  %d\n",u8_to_u32(vsxe_ctx.folders[i].unk1,LE));
 			printf("\n------------------------------------\n");
 		}
 		
 		printf("\nFiles\n");
 		for(int i = 1; i < vsxe_ctx.filecount; i++){
 			u32 ParentFolderIndex = u8_to_u32(vsxe_ctx.files[i].parent_folder_index,LE);
+			u32 PreviousFileIndex = u8_to_u32(vsxe_ctx.files[i].prev_file_id,LE);
 			printf("------------------------------------\n\n");
 			printf("Current File Index:    %d\n",i);
 			if(ParentFolderIndex == 1)
@@ -186,76 +198,196 @@ void VSXE_PrintFSInfo(void)
 			else
 				printf("Parent Folder Index:   %d (%s)\n",ParentFolderIndex,vsxe_ctx.folders[ParentFolderIndex].filename);
 			printf("File Name:             %s\n",vsxe_ctx.files[i].filename);
-			printf("UNK0:                  %d\n",u8_to_u32(vsxe_ctx.files[i].unk0,LE));
+			if(PreviousFileIndex < 1)
+				printf("Prev. File Index:      %d (Is First File in Dir)\n",PreviousFileIndex);
+			else
+				printf("Prev. File Index:      %d (%s)\n",PreviousFileIndex,vsxe_ctx.files[PreviousFileIndex].filename);
+			printf("UNK0:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk0,LE));
 			printf("UNK1:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk1,LE));
-			printf("UNK2:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk2,LE));
 			memdump(stdout,"Unique Extdata ID:     ",vsxe_ctx.files[i].unique_extdata_id,8);
+			printf("UNK2:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk2,LE));
 			printf("UNK3:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk3,LE));
-			printf("UNK4:                  %x\n",u8_to_u32(vsxe_ctx.files[i].unk4,LE));
 			printf("\n------------------------------------\n");
 		}
 	}	
+}
+
+void VSXE_PrintDir(u32 dir, char *pre_string)
+{
+	u32 FolderCount = VSXE_GetDir_FolderCount(dir);
+	u32 FileCount = VSXE_GetDir_FileCount(dir);
+	
+	if(FolderCount){
+		u16 Level = VSXE_GetLevel(dir);
+		u16 SizeOfIndent = sizeof(char)*4*(Level+1);
+		char *LevelIndent = NULL;
+		if(SizeOfIndent){
+			LevelIndent = malloc(SizeOfIndent);
+			memset(LevelIndent,0,SizeOfIndent);
+			for(s16 i = 0; i < Level; i++){
+				sprintf(LevelIndent,"%s%c%c%c%c",LevelIndent,'|',0x20,0x20,0x20);
+			}
+		}
+		u32 folders_index[FolderCount];
+	
+		u32 CurrentFolder = u8_to_u32(vsxe_ctx.folders[dir].last_folder_index,LE);
+		for(s32 i = FolderCount-1; i >= 0; i--){
+			folders_index[i] = CurrentFolder;
+			CurrentFolder = u8_to_u32(vsxe_ctx.folders[CurrentFolder].prev_folder_id,LE);
+		}
+		
+		for(u32 i = 0; i < FolderCount; i++){
+			u32 index = folders_index[i];
+			u32 CurrentFolder_FolderCount = VSXE_GetDir_FolderCount(index);
+			u32 CurrentFolder_FileCount = VSXE_GetDir_FileCount(index);
+			char *filename = vsxe_ctx.folders[index].filename;
+			if(pre_string!=NULL) printf("%s",pre_string);
+			if(LevelIndent != NULL)
+				printf("%s",LevelIndent);
+			if((i == FolderCount-1 || !CurrentFolder_FileCount) && !FileCount) printf("<-- ");
+			else printf("|-- ");
+			printf("%s\n",filename);
+			if(CurrentFolder_FolderCount || CurrentFolder_FileCount)
+				VSXE_PrintDir(index,pre_string);
+		}
+		
+	}
+	if(FileCount){
+		VSXE_PrintFiles_In_Dir(dir,pre_string);
+	}
+}
+
+void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string)
+{
+	u32 FileCount = VSXE_GetDir_FileCount(dir);
+	
+	if(!FileCount) return;
+	
+	u16 Level = VSXE_GetLevel(dir);
+	u16 SizeOfIndent = sizeof(char)*4*(Level+1);
+	char *LevelIndent = NULL;
+	if(SizeOfIndent){
+		LevelIndent = malloc(SizeOfIndent);
+		memset(LevelIndent,0,SizeOfIndent);
+		for(s16 i = 0; i < Level; i++){
+			sprintf(LevelIndent,"%s%c%c%c%c",LevelIndent,'|',0x20,0x20,0x20);
+		}
+	}
+	
+	u32 files_index[FileCount];
+	
+	u32 CurrentFile = u8_to_u32(vsxe_ctx.folders[dir].last_file_index,LE);
+	for(int i = FileCount-1; i >= 0; i--){
+		files_index[i] = CurrentFile;
+		CurrentFile = u8_to_u32(vsxe_ctx.files[CurrentFile].prev_file_id,LE);
+	}
+		
+	for(int i = 0; i < FileCount; i++){
+		u32 index = files_index[i];
+		char *filename = vsxe_ctx.files[index].filename;
+		if(pre_string!=NULL) printf("%s",pre_string);
+		if(LevelIndent != NULL)
+			printf("%s",LevelIndent);
+		if(i == FileCount-1) printf("<-- ");
+			else printf("|-- ");
+		printf("%s (%08x)\n",filename,index+1);
+	}
+	
+	free(LevelIndent);
+	
+	return;
 	
 }
 
-void VSXE_SetupOutputFS(void)
+u32 VSXE_GetDir_FileCount(u32 dir)
 {
-	char *path = malloc(IO_PATH_LEN);
-	for(int i = 1; i < vsxe_ctx.foldercount; i++){
-		memset(path,0,IO_PATH_LEN);
-		sprintf(path,"%s",vsxe_ctx.output);
-		VSXE_ReturnDirPath(i,path,vsxe_ctx.platform);
-		//printf("%s\n",path);
-		chdir(path);
-		for(int j = 2; j < vsxe_ctx.foldercount; j++){
-			if(u8_to_u32(vsxe_ctx.folders[j].parent_folder_index,LE) == i){
-				if(vsxe_ctx.verbose) printf("[+] Creating Dir:           '%s'\n",vsxe_ctx.folders[j].filename);
-				makedir(vsxe_ctx.folders[j].filename);
-			}
-		}
+	u32 FileCount = 0;
+	
+	u32 CurrentFile = u8_to_u32(vsxe_ctx.folders[dir].last_file_index,LE);
+	while (CurrentFile > 0){
+		FileCount++;
+		CurrentFile = u8_to_u32(vsxe_ctx.files[CurrentFile].prev_file_id,LE);
 	}
-	free(path);
+	
+	return FileCount;
 }
 
-int VSXE_WriteExtdataFiles(void)
+u32 VSXE_GetDir_FolderCount(u32 dir)
 {
-	char *inpath = malloc(IO_PATH_LEN);
-	char *outpath = malloc(IO_PATH_LEN);
-	for(u32 i = 1; i < vsxe_ctx.filecount; i++){
-		if(u8_to_u32(vsxe_ctx.files[i].unk2,LE)){
-			memset(inpath,0x0,IO_PATH_LEN);
-			memset(outpath,0x0,IO_PATH_LEN);
-			sprintf(inpath,"%s%c%08x.dec",vsxe_ctx.input,vsxe_ctx.platform,i+1);
-			sprintf(outpath,"%s%c",vsxe_ctx.output,vsxe_ctx.platform);
-			VSXE_ReturnExtdataMountPath(i,outpath,vsxe_ctx.platform);
-			FILE *extdata = fopen(inpath,"rb");
-			if(extdata == NULL){
-				free(inpath);
-				free(outpath);
-				printf("[!] Failed to open %s\n",inpath);
-				return 1;
+	u32 FolderCount = 0;
+	
+	u32 CurrentFolder = u8_to_u32(vsxe_ctx.folders[dir].last_folder_index,LE);
+	while (CurrentFolder > 0){
+		FolderCount++;
+		CurrentFolder = u8_to_u32(vsxe_ctx.folders[CurrentFolder].prev_folder_id,LE);
+	}
+	
+	return FolderCount;
+}
+
+u32 VSXE_GetLevel(u32 dir)
+{
+	u32 path_part_count = 0;
+	u32 present_dir = u8_to_u32(vsxe_ctx.folders[dir].parent_folder_index,LE);
+	while(present_dir > 0){
+		path_part_count++;
+		present_dir = u8_to_u32(vsxe_ctx.folders[present_dir].parent_folder_index,LE);
+	}
+	return path_part_count;
+}
+
+int VSXE_Extract_FileSystem(u32 dir)
+{
+	if(dir == 1) chdir(vsxe_ctx.output);
+	else chdir(vsxe_ctx.folders[dir].filename);
+	
+	int result = 0;
+	u32 FolderCount = VSXE_GetDir_FolderCount(dir);
+	u32 FileCount = VSXE_GetDir_FileCount(dir);
+	
+	if(FolderCount){
+		u32 CurrentFolder = u8_to_u32(vsxe_ctx.folders[dir].last_folder_index,LE);
+		for(u32 i = 0; i < FolderCount; i++){
+			u32 CurrentFolder_FolderCount = VSXE_GetDir_FolderCount(CurrentFolder);
+			u32 CurrentFolder_FileCount = VSXE_GetDir_FileCount(CurrentFolder);
+			makedir(vsxe_ctx.folders[CurrentFolder].filename);
+			if(CurrentFolder_FolderCount || CurrentFolder_FileCount){
+				result = VSXE_Extract_FileSystem(CurrentFolder);
+				if(result) return result;
 			}
-			FILE *outfile = fopen(outpath,"wb");
+			CurrentFolder = u8_to_u32(vsxe_ctx.folders[CurrentFolder].prev_folder_id,LE);
+		}
+		
+	}
+	if(FileCount){
+		u32 CurrentFile = u8_to_u32(vsxe_ctx.folders[dir].last_file_index,LE);
+		char inpath[IO_PATH_LEN];
+		FILE *outfile = NULL;
+		for(u32 i = 0; i < FileCount; i++){
+			outfile = fopen(vsxe_ctx.files[CurrentFile].filename,"wb");
 			if(outfile == NULL){
-				free(inpath);
-				free(outpath);
-				printf("[!] Failed to create %s\n",outpath);
+				printf("[!] Failed to create '%s'\n",vsxe_ctx.files[CurrentFile].filename);
 				return 1;
 			}
-			fclose(extdata);
-			fclose(outfile);		
-			if(VSXE_ExportExtdataImagetoFile(inpath,outpath,vsxe_ctx.files[i].unique_extdata_id) != 0){
-				printf("[!] Failed to Extract '%s' to '%s'\n",inpath,outpath);
+			memset(inpath,0x0,IO_PATH_LEN);
+			sprintf(inpath,"%s%c%08x.dec",vsxe_ctx.input,vsxe_ctx.platform,CurrentFile+1);
+			if(vsxe_ctx.verbose) printf("[+] Writing data in '%s' to: '%s'\n",inpath,vsxe_ctx.files[CurrentFile].filename);
+			if(VSXE_ExportExtdataImagetoFile(inpath,outfile,vsxe_ctx.files[CurrentFile].unique_extdata_id) != 0){
+				printf("[!] Failed to Extract '%s' to '%s'\n",inpath,vsxe_ctx.files[CurrentFile].filename);
 				return 1;
 			}
+			fclose(outfile);
+			
+			CurrentFile = u8_to_u32(vsxe_ctx.files[CurrentFile].prev_file_id,LE);
 		}
 	}
-	free(inpath);
-	free(outpath);
+	
+	if(dir > 1) chdir("..");
+	
 	return 0;
 }
 
-int VSXE_ExportExtdataImagetoFile(char *inpath, char *outpath, u8 *ExtdataUniqueID)
+int VSXE_ExportExtdataImagetoFile(char *inpath, FILE *out, u8 *ExtdataUniqueID)
 {
 	ExtdataContext *ext = malloc(sizeof(ExtdataContext));
 	InitaliseExtdataContext(ext);
@@ -276,11 +408,8 @@ int VSXE_ExportExtdataImagetoFile(char *inpath, char *outpath, u8 *ExtdataUnique
 	if(ext->VSXE_Extdata_ID_Match != True){
 		printf("[!] Caution, extdata image '%s' did not have expected identifier\n",inpath);
 	}
-	FILE *outfile = fopen(outpath,"wb");
-	if(vsxe_ctx.verbose) printf("[+] Writing data in '%s' to: '%s'\n",inpath,outpath);
-	WriteBuffer((ext->extdata.buffer + ext->Files.Data[0].offset),ext->Files.Data[0].size,0,outfile);
+	WriteBuffer((ext->extdata.buffer + ext->Files.Data[0].offset),ext->Files.Data[0].size,0,out);
 	FreeExtdataContext(ext);
-	fclose(outfile);
 	return 0;
 }
 
@@ -334,45 +463,12 @@ void VSXE_ReturnExtdataMountPath(u32 file_id, char *path, u8 platform)
 		folderlocation[i] = present_dir;
 		if(!i)
 			break;
-	}
-	
-	//sprintf(path,"%c",platform);
-	
-	
-	//printf("Init: (%s)\n",path);
+	}	
 	
 	// Adding each directory to the path
 	for(u32 i = 1; i <= path_part_count; i++){
 		u8 folder_id = folderlocation[i];
 		sprintf(path,"%s%s%c",path,vsxe_ctx.folders[folder_id].filename,platform);
-		//printf("%4d: (%s)\n",i,path);
 	}
 	sprintf(path,"%s%s",path,vsxe_ctx.files[file_id].filename);	
-	//printf("Finl: (%s)\n",path);
-}
-
-void VSXE_InterpreteFolderTable(void)
-{
-	folder_table_header *header = (folder_table_header*)(vsxe_ctx.vsxe + vsxe_ctx.folder_table_offset);
-	vsxe_ctx.foldercount = u8_to_u32(header->used_slots,LE);
-	vsxe_ctx.folders = (folder_entry*)(vsxe_ctx.vsxe + vsxe_ctx.folder_table_offset);
-
-	if(vsxe_ctx.verbose){
-		printf("[+] Maximum Folder Entries: %d\n",u8_to_u32(header->max_slots,LE)-1);
-		printf("[+] Used Folder Entries:    %d\n",u8_to_u32(header->used_slots,LE)-1);
-	}
-	return;
-}
-
-void VSXE_InterpreteFileTable(void)
-{
-	file_table_header *header = (file_table_header*)(vsxe_ctx.vsxe + vsxe_ctx.file_table_offset);
-	vsxe_ctx.filecount = u8_to_u32(header->used_slots,LE);
-	vsxe_ctx.files = (file_entry*)(vsxe_ctx.vsxe + vsxe_ctx.file_table_offset);
-
-	if(vsxe_ctx.verbose){
-		printf("[+] Maximum File Entries:   %d\n",u8_to_u32(header->max_slots,LE)-1);
-		printf("[+] Used File Entries:      %d\n",u8_to_u32(header->used_slots,LE)-1);
-	}
-	return;
 }
