@@ -1,5 +1,8 @@
 
 *.o
+*.c~
+*.h~
+*.txt
 *.sh
 *.bat
 make_banner.exe
@@ -17,6 +20,19 @@ make_cia.exe
 *.db
 *.bin
 *.dec
+
+*.cxi
+*.cci
+*.csu
+*.3ds
+*.cfa
+*.tik
+*.tmd
+*.bak
+*.dat
+*.zip
+
+.DS_Store
 
 ############
 ## Windows
