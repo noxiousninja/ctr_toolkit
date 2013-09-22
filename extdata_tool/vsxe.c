@@ -1,4 +1,4 @@
-/**
+﻿/**
 Copyright 2013 3DSGuy
 
 This file is part of extdata_tool.
@@ -30,8 +30,8 @@ void VSXE_InterpreteFileTable(void);
 
 // - Info Functions
 void VSXE_PrintFSInfo(void);
-void VSXE_PrintDir(u32 dir, char *pre_string);
-void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string);
+void VSXE_PrintDir(u32 dir, char *pre_string, char *indent);
+void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string, char *indent);
 u32 VSXE_GetDir_FileCount(u32 dir);
 u32 VSXE_GetDir_FolderCount(u32 dir);
 u32 VSXE_GetLevel(u32 dir);
@@ -149,7 +149,7 @@ void VSXE_PrintFSInfo(void)
 		
 		printf("ExtData FileSystem and Mount Locations:\n");
 		printf(" root\n");
-		VSXE_PrintDir(1," ");
+		VSXE_PrintDir(1," ",NULL);
 	}		
 	if(vsxe_ctx.showfs_tables){
 		printf("\nFolders\n");
@@ -212,22 +212,12 @@ void VSXE_PrintFSInfo(void)
 	}	
 }
 
-void VSXE_PrintDir(u32 dir, char *pre_string)
+void VSXE_PrintDir(u32 dir, char *pre_string, char *indent)
 {
 	u32 FolderCount = VSXE_GetDir_FolderCount(dir);
 	u32 FileCount = VSXE_GetDir_FileCount(dir);
 	
 	if(FolderCount){
-		u16 Level = VSXE_GetLevel(dir);
-		u16 SizeOfIndent = sizeof(char)*4*(Level+1);
-		char *LevelIndent = NULL;
-		if(SizeOfIndent){
-			LevelIndent = malloc(SizeOfIndent);
-			memset(LevelIndent,0,SizeOfIndent);
-			for(s16 i = 0; i < Level; i++){
-				sprintf(LevelIndent,"%s%c%c%c%c",LevelIndent,'|',0x20,0x20,0x20);
-			}
-		}
 		u32 folders_index[FolderCount];
 	
 		u32 CurrentFolder = u8_to_u32(vsxe_ctx.folders[dir].last_folder_index,LE);
@@ -240,39 +230,43 @@ void VSXE_PrintDir(u32 dir, char *pre_string)
 			u32 index = folders_index[i];
 			u32 CurrentFolder_FolderCount = VSXE_GetDir_FolderCount(index);
 			u32 CurrentFolder_FileCount = VSXE_GetDir_FileCount(index);
+			int HasNoChild = (!CurrentFolder_FileCount && !CurrentFolder_FolderCount);
+			int IsLastChild = (!FileCount && i == FolderCount-1);
+			
 			char *filename = vsxe_ctx.folders[index].filename;
 			if(pre_string!=NULL) printf("%s",pre_string);
-			if(LevelIndent != NULL)
-				printf("%s",LevelIndent);
-			if((i == FolderCount-1 || !CurrentFolder_FileCount) && !FileCount) printf("<-- ");
+			if(indent != NULL)
+				printf("%s",indent);
+			if(IsLastChild) printf("'-- ");
 			else printf("|-- ");
 			printf("%s\n",filename);
-			if(CurrentFolder_FolderCount || CurrentFolder_FileCount)
-				VSXE_PrintDir(index,pre_string);
+			
+			if(!HasNoChild){
+				char *tmp = malloc(IO_PATH_LEN);
+				if(indent != NULL){
+					if(!IsLastChild) sprintf(tmp,"%s|   ",indent);
+					if(IsLastChild) sprintf(tmp,"%s    ",indent);
+				}
+				else{
+					if(!IsLastChild) sprintf(tmp,"|   ");
+					if(IsLastChild) sprintf(tmp,"    ");
+				}
+				VSXE_PrintDir(index,pre_string,tmp);
+				free(tmp);
+			}
 		}
 		
 	}
 	if(FileCount){
-		VSXE_PrintFiles_In_Dir(dir,pre_string);
+		VSXE_PrintFiles_In_Dir(dir,pre_string,indent);
 	}
 }
 
-void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string)
+void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string, char *indent)
 {
 	u32 FileCount = VSXE_GetDir_FileCount(dir);
 	
 	if(!FileCount) return;
-	
-	u16 Level = VSXE_GetLevel(dir);
-	u16 SizeOfIndent = sizeof(char)*4*(Level+1);
-	char *LevelIndent = NULL;
-	if(SizeOfIndent){
-		LevelIndent = malloc(SizeOfIndent);
-		memset(LevelIndent,0,SizeOfIndent);
-		for(s16 i = 0; i < Level; i++){
-			sprintf(LevelIndent,"%s%c%c%c%c",LevelIndent,'|',0x20,0x20,0x20);
-		}
-	}
 	
 	u32 files_index[FileCount];
 	
@@ -286,15 +280,13 @@ void VSXE_PrintFiles_In_Dir(u32 dir, char *pre_string)
 		u32 index = files_index[i];
 		char *filename = vsxe_ctx.files[index].filename;
 		if(pre_string!=NULL) printf("%s",pre_string);
-		if(LevelIndent != NULL)
-			printf("%s",LevelIndent);
-		if(i == FileCount-1) printf("<-- ");
+		if(indent != NULL)
+			printf("%s",indent);
+		if(i == FileCount-1) printf("'-- ");
 			else printf("|-- ");
 		printf("%s (%08x)\n",filename,index+1);
 	}
-	
-	free(LevelIndent);
-	
+		
 	return;
 	
 }
