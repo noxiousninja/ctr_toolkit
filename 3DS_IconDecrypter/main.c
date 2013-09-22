@@ -3,17 +3,19 @@
 #define SMDH_SIZE 0x36c0
 #define MAX_CACHE_NUM 360
 #define CACHE_EXTDATA_OFFSET 0x18000 
+#define CACHE_DAT_TID_LIST_SIZE 0x1680
 
 typedef enum
 {
 	MAJOR = 0,
-	MINOR = 2
+	MINOR = 3
 } app_version;
 
 typedef enum
 {
 	gen_xorpad = 0,
 	dec_icondata = 1,
+	read_cache_dat = 2,
 } modes;
 
 typedef enum
@@ -24,12 +26,18 @@ typedef enum
 } icon_type;
 
 const static u8 SRL_ICON_MAGIC[8] = {0x24, 0xFF, 0xAE, 0x51, 0x69, 0x9A, 0xA2, 0x21};
+static u8 FF_bytes[8] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 const static char SMDH_MAGIC[4] = {"SMDH"};
 
 int xor_file(u8 *out, u8 *buff0, u8 *buff1, u32 size);
 void app_title(void);
 void help(char *app_name);
 int CheckDecIcon(u8 *icon);
+
+int ReadCacheDat(int argc, char *argv[]);
+void GenBlankCacheDat(u8 *buffer);
+u64 GetDecTitleID(u8 *enc_used, u8 *enc_blank);
+void GetDecCacheDat(u8 *dec_used, u8 *enc_used, u8 *enc_blank);
 
 
 int main(int argc, char *argv[])
@@ -50,11 +58,23 @@ int main(int argc, char *argv[])
 			mode = dec_icondata; 
 			break;
 		}
+		else if(strcmp(argv[i],"-t") == 0 || strcmp(argv[i],"--disp_tid") == 0){
+			mode = read_cache_dat; 
+			break;
+		}
+		else if(strcmp(argv[i],"-o") == 0 || strncmp(argv[i],"--dec_list=",11) == 0){
+			mode = read_cache_dat; 
+			break;
+		}
 	}
 	if(mode == -1){
 		printf("[!] Invalid Arguments (No Mode Specified)\n");
 		help(argv[0]);
 		return 1;
+	}
+	
+	if(mode == read_cache_dat){
+		return ReadCacheDat(argc,argv);
 	}
 	
 	// Getting Current Working Directory
@@ -268,6 +288,126 @@ int CheckDecIcon(u8 *icon)
 	return BAD_ICON;
 }
 
+int ReadCacheDat(int argc, char *argv[])
+{
+	int Show_TID = False;
+	char *enc_empty_path = NULL;
+	char *enc_used_path = NULL;
+	char *extract_path = NULL;
+	for(int i = 1; i < argc; i++){
+		if(strcmp(argv[i],"-b") == 0 && enc_empty_path == NULL && i < argc-1){ 
+			enc_empty_path = argv[i+1];
+		}
+		else if(strncmp(argv[i],"--empty_image=",14) == 0 && enc_empty_path == NULL){
+			enc_empty_path = (char*)(argv[i]+14);
+		}
+		else if(strcmp(argv[i],"-u") == 0 && enc_used_path == NULL && i < argc-1){ 
+			enc_used_path = argv[i+1];
+		}
+		else if(strncmp(argv[i],"--used_image=",13) == 0 && enc_used_path == NULL){
+			enc_used_path = (char*)(argv[i]+13);
+		}
+		else if(strcmp(argv[i],"-o") == 0 && extract_path == NULL && i < argc-1){ 
+			extract_path = argv[i+1];
+		}
+		else if(strncmp(argv[i],"--dec_list=",11) == 0 && extract_path == NULL){
+			extract_path = (char*)(argv[i]+11);
+		}
+		else if(strcmp(argv[i],"-t") == 0 || strcmp(argv[i],"--disp_tid") == 0){
+			Show_TID = True; 
+		}
+	}
+	
+	if(enc_empty_path == NULL){
+		printf("[!] Empty Title List not specified\n");
+		return 1;
+	}
+	
+	if(enc_used_path == NULL){
+		printf("[!] Used Title List not specified\n");
+		return 1;
+	}
+	
+	if(extract_path == NULL && Show_TID == False){
+		printf("[!] Nothing to do\n");
+		return 1;
+	}
+	
+	FILE *cache_empty_fp = fopen(enc_empty_path,"rb");
+	FILE *cache_used_fp = fopen(enc_used_path,"rb");
+	if(cache_empty_fp == NULL || cache_used_fp == NULL){
+		printf("[!] Error opening input files\n");
+		return 1;
+	}
+	u8 *cache_empty = malloc(CACHE_DAT_TID_LIST_SIZE);
+	u8 *cache_used = malloc(CACHE_DAT_TID_LIST_SIZE);
+	ReadFile_64(cache_empty,CACHE_DAT_TID_LIST_SIZE,0x4000,cache_empty_fp);
+	ReadFile_64(cache_used,CACHE_DAT_TID_LIST_SIZE,0x4000,cache_used_fp);
+	fclose(cache_empty_fp);
+	fclose(cache_used_fp);
+	
+	if(extract_path != NULL){
+		printf("[+] Decrypting Icon Cache List\n");
+		FILE *dec_list_fp = fopen(extract_path,"wb");
+		if(dec_list_fp == NULL){
+			printf("[!] Failed to create '%s'\n",extract_path);
+			return 1;
+		}
+		u8 *dec_cache_list = malloc(CACHE_DAT_TID_LIST_SIZE);
+		GetDecCacheDat(dec_cache_list,cache_used,cache_empty);
+		WriteBuffer(dec_cache_list,CACHE_DAT_TID_LIST_SIZE,0,dec_list_fp);
+		free(dec_cache_list);
+		fclose(dec_list_fp);
+	}
+	
+	if(Show_TID == True){
+		printf("[+] Displaying Title IDs for the Icon Cache Slots\n");
+		int Active_Slots = 0;
+		for(int i = 0; i < 360; i++){
+			u8 *empty_pos = (cache_empty + 0x10*i + 8);
+			u8 *used_pos = (cache_used + 0x10*i + 8);
+			if(memcmp(empty_pos,used_pos,8) == 0){ break; }
+			Active_Slots++;
+		}
+		printf(" There are %d icons in cache\n",Active_Slots);
+		for(int i = 0; i < Active_Slots; i++){
+			u8 *empty_pos = (cache_empty + 0x10*i + 8);
+			u8 *used_pos = (cache_used + 0x10*i + 8);
+			u64 TID = GetDecTitleID(used_pos,empty_pos);
+			printf(" Icon %3d: %016llx\n",i,TID);
+		}
+	}
+	printf("[*] Done\n");
+	return 0;
+}
+
+u64 GetDecTitleID(u8 *enc_used, u8 *enc_blank)
+{
+	u8 xorpad[8];
+	u8 decTID[8];
+	xor_file(xorpad,FF_bytes,enc_blank,8);
+	xor_file(decTID,enc_used,xorpad,8);
+	return u8_to_u64(decTID,LE);
+}
+
+void GenBlankCacheDat(u8 *buffer)
+{
+	memset(buffer,0,CACHE_DAT_TID_LIST_SIZE);
+	for(int i = 0; i < 360; i++){
+		u8 *pos = (buffer + 0x10*i + 8);
+		memset(pos,0xff,8);
+	}
+}
+
+void GetDecCacheDat(u8 *dec_used, u8 *enc_used, u8 *enc_blank)
+{
+	u8 *DecBlankCacheDat = malloc(CACHE_DAT_TID_LIST_SIZE);
+	GenBlankCacheDat(DecBlankCacheDat);
+	u8 *XORpad = malloc(CACHE_DAT_TID_LIST_SIZE);
+	xor_file(XORpad,DecBlankCacheDat,enc_blank,CACHE_DAT_TID_LIST_SIZE);
+	xor_file(dec_used,enc_used,XORpad,CACHE_DAT_TID_LIST_SIZE);
+}
+
 void app_title(void)
 {
 	printf("CTR_Toolkit - Home Menu Icon Cache Decrypter\n");
@@ -287,5 +427,11 @@ void help(char *app_name)
 	printf(" -0, --unused_slots=    Decimal Value         Specify Number of icons that exist before the one you want to decrypt\n");
 	printf(" -1, --num_decrypt=     Decimal Value         Specify Number of icons to decrypt\n");
 	printf(" -g, --genxor                                 Generate XOR pad(s)\n");
-	printf(" -d, --decrypt                                Decrypt Icon Data using XOR pad(s).\n");
+	printf(" -d, --decrypt                                Decrypt Icon Data using XOR pad(s)\n");
+	printf("'Cache.dat' (image 00000004) Options:\n");
+	printf(" -t, --disp_tid                               Display the Title IDs of the icons in the list\n");
+	printf(" -b, --empty_image=     File-in               Specify Empty Encrypted 00000004 image\n");
+	printf(" -u, --used_image=      File-in               Specify Used Encrypted 00000004 image\n");
+	printf(" -o, --dec_list=        File-out              Decrypt Icon cache list from 00000004 image to file\n");
+	
 }

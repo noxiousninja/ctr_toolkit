@@ -29,10 +29,13 @@ make_cia.exe
 *.tik
 *.tmd
 *.bak
+<<<<<<< HEAD
 *.dat
 *.zip
 
 .DS_Store
+=======
+>>>>>>> a52437dfd6eb15f50a6ad273c62b81211c492dd0
 
 ############
 ## Windows
