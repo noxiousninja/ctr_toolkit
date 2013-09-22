@@ -18,6 +18,15 @@ make_cia.exe
 *.bin
 *.dec
 
+*.cxi
+*.cci
+*.csu
+*.3ds
+*.cfa
+*.tik
+*.tmd
+*.bak
+
 ############
 ## Windows
 ############
