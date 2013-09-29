@@ -194,32 +194,26 @@ int VerifyNCCHSection(USER_CONTEXT *ctx, u8 cxi_key[0x10], u32 offset, FILE *ncc
 	if(cxi_ctx->is_cfa == True)
 		memcpy(HeaderRSA.n,ctx->keys.NcsdCfa.n,0x100);
 		
-	else
-		goto prep_cxi_validate;
-		
-validate_header:
-	return ctr_rsa(HeaderSHAHash,HeaderSignature,ctx->keys.NcsdCfa.n,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
-
-prep_cxi_validate:
-	//Getting Exheader
-	memset(&ExHeader,0x0,0x800);
-	fseek(ncch,offset+cxi_ctx->exheader_offset,SEEK_SET);
-	fread(&ExHeader,0x800,1,ncch);
-	if(cxi_ctx->encrypted == True){
-		u8 counter[0x10];
-		ncch_get_counter(cxi_ctx,counter,NCCHTYPE_EXHEADER);
-		ctr_aes_context aes_ctx;
-		memset(&aes_ctx,0x0,sizeof(ctr_aes_context));
-		ctr_init_counter(&aes_ctx, cxi_key, counter);
-		ctr_crypt_counter(&aes_ctx, ExHeader, ExHeader, 0x800);
-		if(memcmp((ExHeader+0x200),cxi_ctx->programID,8) != 0){
-			printf("[!] CXI decryption failed\n");
-			return Fail;
+	else{
+		memset(&ExHeader,0x0,0x800);
+		fseek(ncch,offset+cxi_ctx->exheader_offset,SEEK_SET);
+		fread(&ExHeader,0x800,1,ncch);
+		if(cxi_ctx->encrypted == True){
+			u8 counter[0x10];
+			ncch_get_counter(cxi_ctx,counter,NCCHTYPE_EXHEADER);
+			ctr_aes_context aes_ctx;
+			memset(&aes_ctx,0x0,sizeof(ctr_aes_context));
+			ctr_init_counter(&aes_ctx, cxi_key, counter);
+			ctr_crypt_counter(&aes_ctx, ExHeader, ExHeader, 0x800);
+			if(memcmp((ExHeader+0x200),cxi_ctx->programID,8) != 0){
+				printf("[!] CXI decryption failed\n");
+				return Fail;
+			}
 		}
+		memcpy(HeaderRSA.n,ExHeader+0x500,0x100);
 	}
-	
-	memcpy(HeaderRSA.n,ExHeader+0x500,0x100);
-	goto validate_header;
+		
+	return ctr_rsa(HeaderSHAHash,HeaderSignature,HeaderRSA.n,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
 }
 
 void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info)

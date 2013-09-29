@@ -224,7 +224,7 @@ int GetCXIMetaPreStruct(META_STRUCT *meta, NCCH_STRUCT *cxi_ctx, USER_CONTEXT *c
 {
 	u8 *ExHeader = malloc(cxi_ctx->exheader_size);
 	if(ExHeader == NULL){
-		printf("[!] Failed to allocate memory (0x%x bytes) for ExeFS\n",cxi_ctx->exheader_size);
+		printf("[!] Failed to allocate memory (0x%x bytes) for ExHeader\n",cxi_ctx->exheader_size);
 		return 1; 
 	}	
 	fseek(ncch,offset+cxi_ctx->exheader_offset,SEEK_SET);
