@@ -7,11 +7,7 @@ int NCSDProcess(ROM_CONTEXT *ctx)
 	if(GetNCSDData(ctx) != 0)
 		return Fail;
 		
-	u8 IsNotSuperTrim = (ctx->ncsd_struct->actual_rom_file_size != ctx->ncsd_struct->partition_data[7].offset && ctx->ncsd_struct->partition_data[7].active == True);
-	u8 IsNotTrim = (ctx->ncsd_struct->actual_rom_file_size != ctx->ncsd_struct->used_rom_size);
-	u8 IsNotFullSize = (ctx->ncsd_struct->actual_rom_file_size != ctx->ncsd_struct->rom_size);	
-		
-	if(IsNotSuperTrim && IsNotTrim && IsNotFullSize){
+	if(!ctx->ncsd_struct->ROM_IMAGE_STATUS){
 		printf("[!] ROM is malformed\n");
 		return Fail;
 	}
@@ -35,8 +31,8 @@ int NCSDProcess(ROM_CONTEXT *ctx)
 int TrimROM(ROM_CONTEXT *ctx)
 {
 	printf("[+] Trimming ROM\n");
-	u64 trim_size = ctx->ncsd_struct->used_rom_size;
-	if(ctx->flags[supertrim] == True && ctx->ncsd_struct->partition_data[7].active == True)trim_size = ctx->ncsd_struct->partition_data[7].offset;
+	u64 trim_size = ctx->ncsd_struct->ROM_TRIM_SIZE;
+	if(ctx->flags[supertrim] == True && ctx->ncsd_struct->partition_data[7].active == True)trim_size = ctx->ncsd_struct->ROM_S_TRIM_SIZE;
 	if(TruncateFile_u64(ctx->romfile.argument,trim_size) != 0){
 		printf("[!] Failed to trim ROM\n");
 		return Fail;
@@ -47,28 +43,27 @@ int TrimROM(ROM_CONTEXT *ctx)
 int RestoreROM(ROM_CONTEXT *ctx)
 {
 	printf("[+] Restoring ROM\n");
-	if(ctx->ncsd_struct->actual_rom_file_size < ctx->ncsd_struct->used_rom_size){
+	if(ctx->ncsd_struct->ROM_IMAGE_STATUS == IS_S_TRIM){
 		printf("[!] ROM Is Super Trimmed, it cannot be restored\n");
 		return Fail;
 	}
-	if(TruncateFile_u64(ctx->romfile.argument,ctx->ncsd_struct->rom_size) != 0){
+	if(TruncateFile_u64(ctx->romfile.argument,ctx->ncsd_struct->ROM_CHIP_SIZE) != 0){
 		printf("[!] Failed to Restore ROM\n");
 		return Fail;
 	}
 	FILE *rom = fopen(ctx->romfile.argument,"rb+");
-	fseek_64(rom,ctx->ncsd_struct->used_rom_size,SEEK_SET);
-	WriteDummyBytes(rom,0xff,(ctx->ncsd_struct->rom_size - ctx->ncsd_struct->used_rom_size));
+	fseek_64(rom,ctx->ncsd_struct->ROM_TRIM_SIZE,SEEK_SET);
+	WriteDummyBytes(rom,0xff,(ctx->ncsd_struct->ROM_CHIP_SIZE - ctx->ncsd_struct->ROM_TRIM_SIZE));
 	fclose(rom);
 	return 0;
 }
 
 void WriteDummyBytes(FILE *file, u8 dummy_byte, u64 len)
 {
-	
-	u8 dummy_bytes[16];
-	memset(&dummy_bytes,dummy_byte,16);
-	for(u64 i = 0; i < len; i += 16){
-		fwrite(&dummy_bytes,16,1,file);
+	u8 dummy_bytes[0x200];
+	memset(&dummy_bytes,dummy_byte,0x200);
+	for(u64 i = 0; i < len; i += 0x200){
+		fwrite(&dummy_bytes,0x200,1,file);
 	}
 }
 
@@ -79,8 +74,8 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 		return Fail;
 	memset(ctx->ncsd_struct,0x0,sizeof(NCSD_STRUCT));
 	
-	ctx->ncsd_struct->actual_rom_file_size = GetFileSize_u64(ctx->romfile.argument);
-	
+	ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE = GetFileSize_u64(ctx->romfile.argument);
+
 	NCSD_HEADER header;
 	CARD_INFO_HEADER card_info;
 	DEV_CARD_INFO_HEADER dev_card_info;
@@ -101,18 +96,33 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	
 	u32 media_size = ((header.partition_flags[6] + 1)*0x200);
 	
+	ctx->ncsd_struct->MEDIA_SIZE = media_size;
+	
 	u64 ROM_SIZE_MEDIAS = u8_to_u32(header.rom_size,LE);
-	ctx->ncsd_struct->rom_size = (ROM_SIZE_MEDIAS)*(media_size);
+	ctx->ncsd_struct->ROM_CHIP_SIZE = (ROM_SIZE_MEDIAS)*(ctx->ncsd_struct->MEDIA_SIZE);
 	u32 tmp = u8_to_u32(header.offsetsize_table[0].offset,LE);
 	for(int i = 0; i < 8; i++){
 		tmp += u8_to_u32(header.offsetsize_table[i].size,LE);
+		if (i == 6) ctx->ncsd_struct->ROM_S_TRIM_SIZE = tmp*ctx->ncsd_struct->MEDIA_SIZE;
 	}
-	ctx->ncsd_struct->used_rom_size = tmp*media_size;
-		
+	ctx->ncsd_struct->ROM_TRIM_SIZE = tmp*ctx->ncsd_struct->MEDIA_SIZE;
+	
+	ctx->ncsd_struct->ROM_IMAGE_STATUS = 0;
+	if(ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE == ctx->ncsd_struct->ROM_CHIP_SIZE) ctx->ncsd_struct->ROM_IMAGE_STATUS = IS_FULL;
+	else if(ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE == ctx->ncsd_struct->ROM_TRIM_SIZE) ctx->ncsd_struct->ROM_IMAGE_STATUS = IS_TRIM;
+	else if(ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE == ctx->ncsd_struct->ROM_S_TRIM_SIZE) ctx->ncsd_struct->ROM_IMAGE_STATUS = IS_S_TRIM;
+	else {
+		printf("ROM_IMAGE_FILE_SIZE = 0x%llx\n",ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE);
+		printf("ROM_CHIP_SIZE       = 0x%llx\n",ctx->ncsd_struct->ROM_CHIP_SIZE);
+		printf("ROM_TRIM_SIZE       = 0x%llx\n",ctx->ncsd_struct->ROM_TRIM_SIZE);
+		printf("ROM_S_TRIM_SIZE     = 0x%llx\n",ctx->ncsd_struct->ROM_S_TRIM_SIZE);
+		ctx->ncsd_struct->ROM_IMAGE_STATUS = IS_MALFORMED;
+		//goto fail;
+	}
 	
 	for(int i = 0; i < 8; i++){
-		ctx->ncsd_struct->partition_data[i].offset = u8_to_u32(header.offsetsize_table[i].offset,LE)*media_size;
-		ctx->ncsd_struct->partition_data[i].size = u8_to_u32(header.offsetsize_table[i].size,LE)*media_size;
+		ctx->ncsd_struct->partition_data[i].offset = u8_to_u32(header.offsetsize_table[i].offset,LE)*ctx->ncsd_struct->MEDIA_SIZE;
+		ctx->ncsd_struct->partition_data[i].size = u8_to_u32(header.offsetsize_table[i].size,LE)*ctx->ncsd_struct->MEDIA_SIZE;
 		if(ctx->ncsd_struct->partition_data[i].offset != 0 && ctx->ncsd_struct->partition_data[i].size != 0)
 			ctx->ncsd_struct->partition_data[i].active = True;
 		ctx->ncsd_struct->partition_data[i].title_id = u8_to_u64(header.partition_id_table[i],LE);
@@ -182,8 +192,10 @@ int ExtractROMPartitions(ROM_CONTEXT *ctx)
 		
 	chdir(ctx->outfile.argument);
 	
-	for(int i = 0; i < 8; i++){
-		if(ctx->ncsd_struct->partition_data[i].active == True && ctx->ncsd_struct->partition_data[i].offset < ctx->ncsd_struct->actual_rom_file_size){
+	u64 chunk_size = ctx->ncsd_struct->MEDIA_SIZE;
+	u8 *chunk = malloc(chunk_size);
+	for(int i = 0; i < 8; i++){	
+		if(ctx->ncsd_struct->partition_data[i].active == True && ctx->ncsd_struct->partition_data[i].offset < ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE){
 			char output[1024];
 			memset(&output,0,1024);
 			if(ctx->ncsd_struct->type != nand){
@@ -203,14 +215,24 @@ int ExtractROMPartitions(ROM_CONTEXT *ctx)
 				return Fail;
 			}
 			printf("[+] Writing '%s'\n",output);
-			if(ExportFileToFile(rom,out,ctx->ncsd_struct->partition_data[i].size,ctx->ncsd_struct->partition_data[i].offset,0) != 0){
-				fclose(rom);
-				fclose(out);
-				return Fail;
+			u64 size = ctx->ncsd_struct->partition_data[i].size;
+			u64 chunk_num = (size/chunk_size);
+			u64 in_offset = ctx->ncsd_struct->partition_data[i].offset;
+			u64 out_offset = 0;
+			for(u64 i = 0; i < chunk_num; i++){				
+				fseek_64(rom,in_offset,SEEK_SET);
+				fseek_64(out,out_offset,SEEK_SET);
+				
+				fread(chunk,chunk_size,1,rom);
+				fwrite(chunk,chunk_size,1,out);
+				
+				in_offset += chunk_size;
+				out_offset += chunk_size;
 			}
 			fclose(out);
 		}
 	}
+	free(chunk);
 	fclose(rom);
 	return 0;
 }
@@ -218,52 +240,54 @@ int ExtractROMPartitions(ROM_CONTEXT *ctx)
 void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info)
 {
 	printf("[+] NCSD Header Info\n");
-	memdump(stdout,"Signature:              ",ctx->signature,0x100);
-	printf("Magic:                  NCSD\n");
+	memdump(stdout,"Signature:      ",ctx->signature,0x100);
+	printf("Magic:          NCSD\n");
 	switch(ctx->type){
 		case retail : 
-			printf("NCSD Type:              Retail/Production\n"); 
-			printf("CVer Title ID:          %016llx\n",u8_to_u64(card_info->cver_title_id,LE));
-			printf("CVer Title Ver:         v%d\n",u8_to_u16(card_info->cver_title_version,LE));
+			printf("NCSD Type:      Retail/Production\n"); 
+			printf("CVer Title ID:  %016llx\n",u8_to_u64(card_info->cver_title_id,LE));
+			printf("CVer Title Ver: v%d\n",u8_to_u16(card_info->cver_title_version,LE));
 			char FW_STRING[10];
 			GetMin3DSFW((char*)FW_STRING,card_info);
-			printf("Min 3DS Firm:           %s\n",FW_STRING);
+			printf("Min 3DS Firm:   %s\n",FW_STRING);
 			break;
 		case dev_internal_SDK :
-			printf("NCSD Type:              Debug/Development\n");
-			printf("SDK Type:               Nintendo Internal SDK\n");
-			memdump(stdout,"Title Key:              ",dev_card_info->TitleKey,0x10);
+			printf("NCSD Type:      Debug/Development\n");
+			printf("SDK Type:       Nintendo Internal SDK\n");
+			memdump(stdout,"Title Key:      ",dev_card_info->TitleKey,0x10);
 			break;
 		case dev_external_SDK :
-			printf("NCSD Type:              Debug/Development\n");
-			printf("SDK Type:               Nintendo 3RD Party SDK\n");
-			memdump(stdout,"Title Key:              ",dev_card_info->TitleKey,0x10);
+			printf("NCSD Type:      Debug/Development\n");
+			printf("SDK Type:       Nintendo 3RD Party SDK\n");
+			memdump(stdout,"Title Key:      ",dev_card_info->TitleKey,0x10);
 			break;
 		case nand :
-			printf("NCSD Type:              CTR NAND Dump\n");
+			printf("NCSD Type:      CTR NAND Dump\n");
 	}	
-	//char full_size_string[100];
-	//char actual_size_string[100];
-	GetCHIPFullSize(/*(char*)full_size_string,*/ctx->rom_size,ctx->type);
-	GetROMUsedSize(/*(char*)actual_size_string,*/ctx->used_rom_size,ctx->actual_rom_file_size,ctx->type);
-	//printf("%s\n",full_size_string);
-	//printf("%s\n",actual_size_string);
+	
+	// Print CHIP Size
+	// Print ROM Used Size
+	// Print ROM Image Size (STATUS)
+	GetCHIPFullSize(ctx->ROM_CHIP_SIZE,ctx->type);
+	GetROMUsedSize(ctx->ROM_TRIM_SIZE,ctx->type);
+	GetROMImageStatus(ctx->ROM_IMAGE_FILE_SIZE,ctx->ROM_IMAGE_STATUS,ctx->type);
+	
 	
 	if(ctx->type != nand){
-		printf("NCSD Title ID:          %016llx\n",u8_to_u64(header->title_id,LE));
-		memdump(stdout,"ExHeader Hash:          ",header->exheader_hash,0x20);
-		printf("AddHeader Size:         0x%x\n",u8_to_u32(header->additional_header_size,LE));
+		printf("NCSD Title ID:  %016llx\n",u8_to_u64(header->title_id,LE));
+		memdump(stdout,"ExHeader Hash:  ",header->exheader_hash,0x20);
+		printf("AddHeader Size: 0x%x\n",u8_to_u32(header->additional_header_size,LE));
 	}
 	else{
-		printf("Sector 0 Offset:        0x%x\n",u8_to_u32(header->sector_zero_offset,LE));
+		printf("Sector 0 Offset: 0x%x\n",u8_to_u32(header->sector_zero_offset,LE));
 	}
-	memdump(stdout,"Flags:                  ",header->partition_flags,8);
+	memdump(stdout,"Flags:          ",header->partition_flags,8);
 	printf("\n");
 	
 	printf("[+] NCSD Partitions\n");
 	int firm_count = 0;
 	for(int i = 0; i < 8; i++){
-		if(ctx->partition_data[i].active == True){
+		if(ctx->partition_data[i].active == True && !(ctx->ROM_IMAGE_STATUS == IS_S_TRIM && i == 7)){
 			printf("Partition %d\n",i);
 			if(ctx->partition_data[i].content_type != _unknown){
 				printf(" Title ID:              %016llx\n",ctx->partition_data[i].title_id);
@@ -299,7 +323,7 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 	}
 }
 
-void GetCHIPFullSize(/*char *string,*/u64 size, int type)
+void GetCHIPFullSize(u64 ROM_CHIP_SIZE, int type)
 {
 	char string[100];
 	u64 UnitSizesBytes[3] = {GB,MB,KB};
@@ -310,20 +334,20 @@ void GetCHIPFullSize(/*char *string,*/u64 size, int type)
 	u8 ByteIndex = 0;
 	u8 ChipIndex = 0;
 	if(type == nand) ChipIndex = 1;
-	while(size < UnitSizesBytes[ByteIndex]){
+	while(ROM_CHIP_SIZE < UnitSizesBytes[ByteIndex]){
 		if(ByteIndex == 2) break;
 		ByteIndex++;
 	}
 	
-	sprintf(string,"%s         %lld %s",ChipName[ChipIndex],(size/UnitSizesBytes[ByteIndex]),Str_UnitSizesBytes[ByteIndex]);
-	if((size/UnitSizesBits[ByteIndex]) >= UnitSizesBytes[ByteIndex+1])
+	sprintf(string,"%s %lld %s",ChipName[ChipIndex],(ROM_CHIP_SIZE/UnitSizesBytes[ByteIndex]),Str_UnitSizesBytes[ByteIndex]);
+	if((ROM_CHIP_SIZE/UnitSizesBits[ByteIndex]) >= UnitSizesBytes[ByteIndex+1])
 		ByteIndex--;
-	sprintf(string,"%s (%lld %s)",string,(size/UnitSizesBits[ByteIndex]),Str_UnitSizesBits[ByteIndex]);
+	sprintf(string,"%s (%lld %s)",string,(ROM_CHIP_SIZE/UnitSizesBits[ByteIndex]),Str_UnitSizesBits[ByteIndex]);
 
 	printf("%s\n",string);
 	return;
 }
-void GetROMUsedSize(/*char *string,*/u64 expected_size, u64 actual_size, int type)
+void GetROMUsedSize(u64 ROM_TRIM_SIZE, int type)
 {
 	char string[100];
 	u64 UnitSizesBytes[2] = {MB,KB};
@@ -331,19 +355,32 @@ void GetROMUsedSize(/*char *string,*/u64 expected_size, u64 actual_size, int typ
 	char ChipName[2][20] = {"ROM Used Size:  ","NAND Image Size:"};
 	u8 ByteIndex = 0;
 	u8 ChipIndex = 0;
-	u8 SuperTrimmed = False;
-	if(actual_size < expected_size) SuperTrimmed = True; 
 	if(type == nand) ChipIndex = 1;
-	if(actual_size < UnitSizesBytes[ByteIndex]) ByteIndex = 1;
+	if(ROM_TRIM_SIZE < UnitSizesBytes[ByteIndex]) ByteIndex = 1;
 	
-	sprintf(string,"%s        %lld %s",ChipName[ChipIndex],(actual_size/UnitSizesBytes[ByteIndex]),Str_UnitSizesBytes[ByteIndex]);
-	switch(SuperTrimmed){
-		case True: sprintf(string,"%s (0x%llx bytes)(SuperTrimmed)",string,actual_size); break;
-		default: sprintf(string,"%s (0x%llx bytes)",string,actual_size); break;
-	}
+	sprintf(string,"%s%lld %s",ChipName[ChipIndex],(ROM_TRIM_SIZE/UnitSizesBytes[ByteIndex]),Str_UnitSizesBytes[ByteIndex]);
+	sprintf(string,"%s (0x%llx bytes)",string,ROM_TRIM_SIZE);
+
 	printf("%s\n",string);
 	return;
 }
+
+void GetROMImageStatus(u64 ROM_IMAGE_FILE_SIZE, u8 ROM_IMAGE_STATUS, int type)
+{
+	if(type == nand) return;
+	
+	char string[100];
+	u64 UnitSizesBytes[2] = {MB,KB};
+	char Str_UnitSizesBytes[2][3] = {"MB","KB"};
+	char Str_ROM_Status[4][20] = {"Malformed","Full Size","Trimmed","Super Trimed"};
+	u8 ByteIndex = 0;
+	if(ROM_IMAGE_FILE_SIZE < UnitSizesBytes[ByteIndex]) ByteIndex = 1;
+	
+	sprintf(string,"ROM Image File:\n > Size         %lld %s",(ROM_IMAGE_FILE_SIZE/UnitSizesBytes[ByteIndex]),Str_UnitSizesBytes[ByteIndex]);
+	sprintf(string,"%s\n > Status       %s",string,Str_ROM_Status[ROM_IMAGE_STATUS]);
+	
+	printf("%s\n",string);
+	return;}
 
 void GetMin3DSFW(char *FW_STRING, CARD_INFO_HEADER *card_info)
 {

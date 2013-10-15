@@ -22,6 +22,14 @@ typedef enum
 
 typedef enum
 {
+	IS_MALFORMED = 0,
+	IS_FULL,
+	IS_TRIM,
+	IS_S_TRIM,
+} rom_status;
+
+typedef enum
+{
 	info = 0,
 	restore = 1,
 	trim = 2,
@@ -47,9 +55,15 @@ typedef struct
 {
 	int type;
 	u8 signature[0x100];
-	u64 rom_size;
-	u64 used_rom_size;
-	u64 actual_rom_file_size;
+	u64 MEDIA_SIZE;	
+	
+	u64 ROM_CHIP_SIZE;
+	u64 ROM_TRIM_SIZE;
+	u64 ROM_S_TRIM_SIZE;
+	
+	u64 ROM_IMAGE_FILE_SIZE;
+	u8 ROM_IMAGE_STATUS;
+	
 	PARTITION_DATA partition_data[8];
 } NCSD_STRUCT;
 

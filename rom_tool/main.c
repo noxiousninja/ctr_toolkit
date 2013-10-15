@@ -5,7 +5,7 @@
 typedef enum
 {
 	MAJOR = 2,
-	MINOR = 8
+	MINOR = 9
 } AppVer;
 
 void app_title(void);
