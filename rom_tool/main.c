@@ -29,21 +29,6 @@ int main(int argc, char *argv[])
 			free_buffers(ctx);
 			return ARGC_FAIL;
 		}
-		else if(i == argc-1){
-			ctx->romfile.arg_len = strlen(argv[i]);
-			ctx->romfile.argument = malloc(ctx->romfile.arg_len+1);
-			if(ctx->romfile.argument == NULL){
-				printf("[!] MEM ERROR\n");
-				return Fail;
-			}
-			memcpy(ctx->romfile.argument,argv[i],ctx->romfile.arg_len+1);
-			FILE *rom = fopen(ctx->romfile.argument,"rb");
-			if(rom == NULL){
-				printf("[!] Failed to open '%s'\n",ctx->romfile.argument);
-				return 1;
-			}
-			fclose(rom);
-		}
 		else if(strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--info") == 0)
 			ctx->flags[info] = True;
 		else if(strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--restore") == 0)
@@ -74,6 +59,21 @@ int main(int argc, char *argv[])
 			}
 			memcpy(ctx->outfile.argument,argv[i]+10,ctx->outfile.arg_len+1);
 		}
+		else if(i == argc-1){
+			ctx->romfile.arg_len = strlen(argv[i]);
+			ctx->romfile.argument = malloc(ctx->romfile.arg_len+1);
+			if(ctx->romfile.argument == NULL){
+				printf("[!] MEM ERROR\n");
+				return Fail;
+			}
+			memcpy(ctx->romfile.argument,argv[i],ctx->romfile.arg_len+1);
+			FILE *rom = fopen(ctx->romfile.argument,"rb");
+			if(rom == NULL){
+				printf("[!] Failed to open '%s'\n",ctx->romfile.argument);
+				return 1;
+			}
+			fclose(rom);
+		}
 	}
 	
 	if(ctx->flags[restore] == True && ctx->flags[trim] == True){
@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
 		free_buffers(ctx);
 		return 1;
 	}
-		
+
 	if(NCSDProcess(ctx) != 0)
 		goto fail_cleanup;
 	

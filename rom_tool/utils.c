@@ -150,7 +150,7 @@ u64 GetFileSize_u64(char *filename)
 #else
 	FILE *file = fopen(filename,"rb");
 	fseeko(file, 0L, SEEK_END);
-	size = ftello(file);
+	size = (u64)ftello(file);
 	fclose(file);
 #endif
 	return size;
@@ -189,7 +189,7 @@ int TruncateFile_u64(char *filename, u64 filelen)
 	CloseHandle(fh);
 	return 0;
 #else
-	return truncate(filename,filelen);
+	return truncate64(filename,filelen); //truncate(filename,filelen);
 #endif	
 }
 

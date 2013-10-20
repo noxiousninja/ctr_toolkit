@@ -1,7 +1,7 @@
 OBJS = utils.o main.o ncsd.o
 LIBS = -static-libgcc -static-libstdc++
 CXXFLAGS = -I.
-CFLAGS = --std=c99 -Wall -I.
+CFLAGS = --std=c99 -Wall -I. -D_FILE_OFFSET_BITS=64
 OUTPUT = rom_tool
 CC = gcc
 

@@ -73,7 +73,6 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	if(ctx->ncsd_struct == NULL)
 		return Fail;
 	memset(ctx->ncsd_struct,0x0,sizeof(NCSD_STRUCT));
-	
 	ctx->ncsd_struct->ROM_IMAGE_FILE_SIZE = GetFileSize_u64(ctx->romfile.argument);
 
 	NCSD_HEADER header;
