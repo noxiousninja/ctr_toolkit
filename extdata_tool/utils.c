@@ -71,6 +71,11 @@ u32 align_value(u32 value, u32 alignment)
 	return (value + (alignment - tmp));
 }
 
+int CheckBitmask(u16 Bitmask, u16 Bit)
+{
+	return ((Bitmask&Bit) == Bit);
+}
+
 void resolve_flag(unsigned char flag, unsigned char *flag_bool)
 {
 	unsigned char bit_mask[8] = {0x80,0x40,0x20,0x10,0x8,0x4,0x2,0x1};

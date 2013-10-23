@@ -39,6 +39,7 @@ void endian_memcpy(u8 *destination, u8 *source, u32 size, int endianness);
 void u8_hex_print_be(u8 *array, int len);
 void u8_hex_print_le(u8 *array, int len);
 u32 align_value(u32 value, u32 alignment);
+int CheckBitmask(u16 Bitmask, u16 Bit);
 void resolve_flag(unsigned char flag, unsigned char *flag_bool);
 void resolve_flag_u16(u16 flag, unsigned char *flag_bool);
 int append_filextention(char *output, u16 max_outlen, char *input, char extention[]); 
