@@ -224,82 +224,60 @@ void PrintTitleInfoData(TITLE_INFO_ENTRY_STRUCT *info)
 
 void GetTitleType(u8 TitleID[8])
 {
-	u8 FlagBool[16];
+	//u8 FlagBool[16];
 	u16 TitleTypeID = u8_to_u16(TitleID+4,LE);
-	resolve_flag_u16(TitleTypeID,FlagBool);
+	//resolve_flag_u16(TitleTypeID,FlagBool);
 	
-	int TitlePlatform_FLAG = Invalid;
-	int TitleType_FLAG = Invalid;
+	int TitlePlatform_FLAG = CTR;
+	int TitleType_FLAG = Regular;
 	int TitleAppType_FLAG = Application;
 	
-	if(TitleTypeID == 0){
-		TitlePlatform_FLAG = CTR;
-		TitleType_FLAG = Regular;
-		TitleAppType_FLAG = Application;
-		goto print_info;
+	if(CheckBitmask(TitleTypeID,0x8000) && !CheckBitmask(TitleTypeID,0x4000)){
+		TitlePlatform_FLAG = TWL;
+		if(CheckBitmask(TitleTypeID,0x1)){
+			TitleType_FLAG = System;
+			printf("Hey\n");
+		}
+		else{
+			TitleType_FLAG = Regular;
+		}
+		
+		if(CheckBitmask(TitleTypeID,0x4)){
+			TitleAppType_FLAG = Application;
+			if(CheckBitmask(TitleTypeID,0x2)){
+				TitleAppType_FLAG = Applet;
+				if(CheckBitmask(TitleTypeID,0x8)){
+					TitleAppType_FLAG = Data_Archive;
+				}
+			}
+		}
 	}
 	
-	if(FlagBool[15] == True && FlagBool[14] == False)
-		goto twl_content;
-	else
-		goto ctr_content;
-	
-	if(TitlePlatform_FLAG == Invalid){
-		return;
+	else if(TitlePlatform_FLAG == CTR){
+		if(CheckBitmask(TitleTypeID,0x10) && !CheckBitmask(TitleTypeID,0x4000)){
+			TitleType_FLAG = System;
+			
+		}
+		else{
+			TitleType_FLAG = Regular;
+		}
+		if(CheckBitmask(TitleTypeID,0x1)) TitleAppType_FLAG = DLP_Child;
+		if(CheckBitmask(TitleTypeID,0x2)) TitleAppType_FLAG = Demo;
+		if(CheckBitmask(TitleTypeID,0xB)) TitleAppType_FLAG = Data_Archive;
+		if(CheckBitmask(TitleTypeID,0xE)) TitleAppType_FLAG = Addon_Content;
+		if(CheckBitmask(TitleTypeID,0x8C)) TitleAppType_FLAG = DLC_Content;
+		if(CheckBitmask(TitleTypeID,0x20)){
+			TitleAppType_FLAG = Applet;
+			if(CheckBitmask(TitleTypeID,0x100)){
+				TitleAppType_FLAG = Module;
+				if(CheckBitmask(TitleTypeID,0x8)){
+					TitleAppType_FLAG = Firmware;
+				}
+			}
+		}
+		
 	}
 
-ctr_content:
-	TitlePlatform_FLAG = CTR;
-	if(FlagBool[14] == False && FlagBool[15] == False && FlagBool[4] == True)
-		TitleType_FLAG = System;
-	else
-		TitleType_FLAG = Regular;
-	
-	if(FlagBool[0] == True)
-		TitleAppType_FLAG = DLP_Child;
-	
-	if(FlagBool[1] == True)
-		TitleAppType_FLAG = Demo;
-		
-	if(FlagBool[1] == True && FlagBool[2] == True && FlagBool[3] == True)
-		TitleAppType_FLAG = Addon_Content;
-	
-	if(FlagBool[2] == True && FlagBool[3] == True && FlagBool[7] == True)
-		TitleAppType_FLAG = DLC_Content;
-	
-	if(TitleType_FLAG == System){
-		if(FlagBool[5] == True)
-			TitleAppType_FLAG = Applet;
-		if(FlagBool[5] == True && FlagBool[8] == True)
-			TitleAppType_FLAG = Module;
-		if(FlagBool[5] == True && FlagBool[8] == True && FlagBool[3] == True)
-			TitleAppType_FLAG = Firmware;
-	}
-	
-	if(FlagBool[0] == True && FlagBool[1] == True && FlagBool[2] == False && FlagBool[3] == True)
-		TitleAppType_FLAG = Data_Archive;
-		
-	goto print_info;
-	
-twl_content:
-	TitlePlatform_FLAG = TWL;
-	if(FlagBool[0] == True)
-		TitleType_FLAG = System;
-	else
-		TitleType_FLAG = Regular;
-	
-	if(FlagBool[2] == True)
-		TitleAppType_FLAG = Application;
-	
-	if(FlagBool[1] == True && FlagBool[2] == True)
-		TitleAppType_FLAG = Applet;
-		
-	if(FlagBool[1] == True && FlagBool[2] == True && FlagBool[3] == True)
-		TitleAppType_FLAG = Data_Archive;
-		
-	goto print_info;
-	
-print_info:
 	printf(" Platform:                   %s\n",TitlePlatformString[TitlePlatform_FLAG]);
 	printf(" Content Type:               %s%s\n",TitleTypeString[TitleType_FLAG],TitleAppTypeString[TitleAppType_FLAG]);
 	if(TitlePlatform_FLAG == TWL){
