@@ -7,7 +7,7 @@ int NCSDProcess(ROM_CONTEXT *ctx)
 	if(GetNCSDData(ctx) != 0)
 		return Fail;
 		
-	if(!ctx->ncsd_struct->ROM_IMAGE_STATUS){
+	if(!ctx->ncsd_struct->ROM_IMAGE_STATUS && ctx->ncsd_struct->type != nand){
 		printf("[!] ROM is malformed\n");
 		return Fail;
 	}
@@ -32,7 +32,7 @@ int TrimROM(ROM_CONTEXT *ctx)
 {
 	printf("[+] Trimming ROM\n");
 	u64 trim_size = ctx->ncsd_struct->ROM_TRIM_SIZE;
-	if(ctx->flags[supertrim] == True && ctx->ncsd_struct->partition_data[7].active == True)trim_size = ctx->ncsd_struct->ROM_S_TRIM_SIZE;
+	if(ctx->flags[supertrim] == True && ctx->ncsd_struct->partition_data[7].active == True && ctx->ncsd_struct->type != nand)trim_size = ctx->ncsd_struct->ROM_S_TRIM_SIZE;
 	if(TruncateFile_u64(ctx->romfile.argument,trim_size) != 0){
 		printf("[!] Failed to trim ROM\n");
 		return Fail;
@@ -93,7 +93,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 		goto fail;
 	}
 	
-	u32 media_size = ((header.partition_flags[6] + 1)*0x200);
+	u32 media_size = ((header.partition_flags[MEDIA_UNIT_SIZE] + 1)*0x200);
 	
 	ctx->ncsd_struct->MEDIA_SIZE = media_size;
 	
@@ -158,9 +158,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 			ctx->ncsd_struct->partition_data[i].content_type = _unknown;
 	}
 	
-	u8 *zeros = malloc(0x30);
-	memset(zeros,0,0x30);
-	if(memcmp(&header.reserved,zeros,0x30) != 0)
+	if(header.partition_flags[MEDIA_TYPE_INDEX] == INNER_DEVICE)
 		ctx->ncsd_struct->type = nand;
 	else if(u8_to_u64(card_info.cver_title_id,LE) == 0){
 		u8 stock_title_key[0x10] = {0x6E, 0xC7, 0x5F, 0xB2, 0xE2, 0xB4, 0x87, 0x46, 0x1E, 0xDD, 0xCB, 0xB8, 0x97, 0x11, 0x92, 0xBA};
@@ -171,7 +169,6 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	}
 	else
 		ctx->ncsd_struct->type = retail;
-	free(zeros);
 		
 	if(ctx->flags[info])
 		PrintNCSDData(ctx->ncsd_struct,&header,&card_info,&dev_card_info);
@@ -274,15 +271,53 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 	
 	if(ctx->type != nand){
 		printf("NCSD Title ID:  %016llx\n",u8_to_u64(header->title_id,LE));
-		memdump(stdout,"ExHeader Hash:  ",header->exheader_hash,0x20);
-		printf("AddHeader Size: 0x%x\n",u8_to_u32(header->additional_header_size,LE));
+		//memdump(stdout,"ExHeader Hash:  ",header->exheader_hash,0x20);
+		//printf("AddHeader Size: 0x%x\n",u8_to_u32(header->additional_header_size,LE));
 	}
 	else{
 		printf("Sector 0 Offset: 0x%x\n",u8_to_u32(header->sector_zero_offset,LE));
 	}
 	memdump(stdout,"Flags:          ",header->partition_flags,8);
+	if(ctx->type != nand){
+		if(!header->partition_flags[MEDIA_6X_SAVE_CRYPTO] && !header->partition_flags[MEDIA_CARD_DEVICE] && !header->partition_flags[MEDIA_CARD_DEVICE_OLD]){
+			printf(" > Save Crypto: Repeating CTR Fail\n");
+		}
+		else if(!header->partition_flags[MEDIA_6X_SAVE_CRYPTO] && (header->partition_flags[MEDIA_CARD_DEVICE] || header->partition_flags[MEDIA_CARD_DEVICE_OLD])){
+			printf(" > Save Crypto: 2.2.0-4 KeyY Method\n");
+		}
+		else if(header->partition_flags[MEDIA_6X_SAVE_CRYPTO] == 1 && !header->partition_flags[MEDIA_CARD_DEVICE_OLD]){
+			//if(header->partition_flags[MEDIA_CARD_DEVICE] == 2){
+			//	printf(" > Save Crypto: 2.2.0-4 KeyY Method\n");
+			//}
+			/*else*/ if(header->partition_flags[MEDIA_CARD_DEVICE]/* == 3*/){
+				printf(" > Save Crypto: 6.0.0-11 KeyY Method\n");
+			}
+		}
+		u8 CardDevice = header->partition_flags[MEDIA_CARD_DEVICE_OLD] + header->partition_flags[MEDIA_CARD_DEVICE];
+		switch (CardDevice){
+			case CARD_DEVICE_NOR_FLASH: printf(" > Card Device: CARD_DEVICE_NOR_FLASH\n"); break;
+			case CARD_DEVICE_NONE: printf(" > Card Device: CARD_DEVICE_NONE\n"); break;
+			case CARD_DEVICE_BT: printf(" > Card Device: CARD_DEVICE_BT\n"); break;
+		}
+		switch (header->partition_flags[MEDIA_TYPE_INDEX]){
+			case INNER_DEVICE: printf(" > Media Type:  Internal NAND\n"); break;
+			case CARD1: printf(" > Media Type:  CARD1\n"); break;
+			case CARD2: printf(" > Media Type:  CARD2\n"); break;
+			case EXTENDED_DEVICE: printf(" > Media Type:  EXTENDED_DEVICE\n"); break;
+		}
+	}
+	/**
+	for(int i = 0; i < 8; i++){
+		printf("Flag [%d]: %d  ",i,header->partition_flags[i]);
+		if(i == 3) printf("MEDIA_CARD_DEVICE");
+		if(i == 4) printf("MEDIA_PLATFORM_INDEX");
+		if(i == 5) printf("MEDIA_TYPE_SIZE");
+		if(i == 6) printf("MEDIA_UNIT_SIZE");
+		if(i == 7) printf("MEDIA_CARD_DEVICE (old)");
+		printf("\n");
+	}
+	**/
 	printf("\n");
-	
 	printf("[+] NCSD Partitions\n");
 	int firm_count = 0;
 	for(int i = 0; i < 8; i++){

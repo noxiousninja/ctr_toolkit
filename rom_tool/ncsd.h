@@ -6,6 +6,38 @@ typedef enum
 	nand
 } ncsd_types;
 
+// Flag Enums
+typedef enum 
+{
+	MEDIA_6X_SAVE_CRYPTO = 1,
+	MEDIA_CARD_DEVICE = 3,
+	MEDIA_PLATFORM_INDEX = 4,
+	MEDIA_TYPE_INDEX = 5,
+	MEDIA_UNIT_SIZE = 6,
+	MEDIA_CARD_DEVICE_OLD = 7
+}FlagIndex;
+
+typedef enum
+{
+	CARD_DEVICE_NOR_FLASH = 1,
+	CARD_DEVICE_NONE = 2,
+	CARD_DEVICE_BT = 3
+} _CardDevice;
+
+typedef enum
+{
+	CTR,
+} _PlatformIndex;
+
+typedef enum
+{
+	INNER_DEVICE,
+	CARD1,
+	CARD2,
+	EXTENDED_DEVICE
+} _TypeIndex;
+
+//
 typedef enum
 {
 	EUR_ROM = 0x00017102,

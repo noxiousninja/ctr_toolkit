@@ -189,7 +189,7 @@ int TruncateFile_u64(char *filename, u64 filelen)
 	CloseHandle(fh);
 	return 0;
 #else
-	return truncate64(filename,filelen); //truncate(filename,filelen);
+	return truncate(filename,filelen); //truncate(filename,filelen);
 #endif	
 }
 
