@@ -31,10 +31,11 @@ typedef enum
 typedef enum
 {
 	info = 0,
-	restore = 1,
-	trim = 2,
-	supertrim = 3,
-	extract = 4,
+	part_info,
+	restore,
+	trim,
+	remove_update_partition,
+	extract
 } flag_index;
 
 //Variable Structs
@@ -64,6 +65,7 @@ typedef struct
 	u64 ROM_IMAGE_FILE_SIZE;
 	u8 ROM_IMAGE_STATUS;
 	
+	u8 partition_count;
 	PARTITION_DATA partition_data[8];
 } NCSD_STRUCT;
 
@@ -78,6 +80,6 @@ typedef struct
 	NCSD_STRUCT *ncsd_struct;
 	
 	//Settings
-	u8 flags[5];
+	u8 flags[6];
 } __attribute__((__packed__)) 
 ROM_CONTEXT;

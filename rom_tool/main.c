@@ -4,8 +4,8 @@
 
 typedef enum
 {
-	MAJOR = 2,
-	MINOR = 9
+	MAJOR = 3,
+	MINOR = 0
 } AppVer;
 
 void app_title(void);
@@ -31,13 +31,15 @@ int main(int argc, char *argv[])
 		}
 		else if(strcmp(argv[i], "-i") == 0 || strcmp(argv[i], "--info") == 0)
 			ctx->flags[info] = True;
+		else if(strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--partition_info") == 0)
+			ctx->flags[part_info] = True;
 		else if(strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--restore") == 0)
 			ctx->flags[restore] = True;
 		else if(strcmp(argv[i], "-t") == 0 || strcmp(argv[i], "--trim") == 0)
 			ctx->flags[trim] = True;
-		else if(strcmp(argv[i], "-s") == 0 || strcmp(argv[i], "--supertrim") == 0){
+		else if(strcmp(argv[i], "-u") == 0 || strcmp(argv[i], "--remove_update") == 0){
 			ctx->flags[trim] = True;
-			ctx->flags[supertrim] = True;
+			ctx->flags[remove_update_partition] = True;
 		}
 		else if(strcmp(argv[i], "-x") == 0 && ctx->flags[extract] == False && i+1 < (argc - 1)){
 			ctx->flags[extract] = True;
@@ -84,7 +86,7 @@ int main(int argc, char *argv[])
 	}
 	
 	int Action = 0;
-	for(int i = 0; i < 5; i++){
+	for(int i = 0; i < 6; i++){
 		if(ctx->flags[i] == True)
 			Action++;
 	}
@@ -137,8 +139,10 @@ void help(char *app_name)
 	printf("OPTIONS            Possible Values         Explanation\n");
 	printf(" -h, --help                                Print this help.\n");
 	printf(" -i, --info                                Print 3DS ROM Info\n");
+	printf(" -p, --partition_info                      Print ROM Partition Info\n");
+	//printf(" -v, --verify_rom                          Verify ROM\n");
 	printf(" -r, --restore                             Restore(Un-Trim) 3DS ROM File.\n");
 	printf(" -t, --trim                                Trim 3DS ROM File.\n");
-	printf(" -s, --supertrim                           Same as '-t' but removes the update partition\n");
+	printf(" -u, --remove_update                       Removes the update partition\n");
 	printf(" -x, --extract=    Dir-out                 Extract NCSD Partitions to directory\n");
 }
