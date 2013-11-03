@@ -191,27 +191,20 @@ namespace _3DSExplorer.Modules
 
     public struct NCCHDetails
     {
-        public int crypto;
+        public int crypto_type;
+        public ulong ncch_size;
+
         public string encryption;
         public string ncch_type;
+        public string ncch_size_str;
         public string content_type_str;
         public string sdk_build;
         public string sdk_version;
         public string req_kernel;
 
         public bool IsCfa;
-
-        public int content_type;
         public UInt32 media_unit;
-        public int crypto_type;
 
-        //[MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-        public byte[] TitleID;
-
-        //[MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-        public byte[] ProgramID;
-
-      
         public UInt32 UniqueID;
 
     }
@@ -233,6 +226,13 @@ namespace _3DSExplorer.Modules
         {
             NCCH,
             NCCHPlainRegion
+        };
+
+        private enum SizeUnits
+        {
+            KB = 1024,
+            MB = 1048576,
+            GB = 1073741824
         };
 
         public enum NCCH_Crypto
@@ -307,30 +307,32 @@ namespace _3DSExplorer.Modules
                     f.AddListItem(string.Empty, string.Empty, "Content Type", string.Empty, NcchInfo.content_type_str, 1-mod);
                     f.AddListItem(string.Empty, string.Empty, "Unique ID", string.Empty, "0x" + NcchInfo.UniqueID.ToString("X"), 1 - mod);
                     f.AddListItem(string.Empty, string.Empty, "Crypto Key", string.Empty, NcchInfo.encryption, 1 - mod);
+                    f.AddListItem(string.Empty, string.Empty, NcchInfo.ncch_type + " Size", string.Empty, NcchInfo.ncch_size_str, 1 - mod);
                     if (!NcchInfo.IsCfa)
                     {
                         if (NcchInfo.sdk_build != null)
                         {
-                            f.AddListItem(string.Empty, string.Empty, "Build Type", string.Empty, NcchInfo.sdk_build, 1 - mod);
+                            f.AddListItem(string.Empty, string.Empty, "Build Type", string.Empty, NcchInfo.sdk_build, 1);
                         }
                         if (NcchInfo.sdk_version != null)
                         {
-                            f.AddListItem(string.Empty, string.Empty, "SDK Version", string.Empty, NcchInfo.sdk_version, 1 - mod);
+                            f.AddListItem(string.Empty, string.Empty, "SDK Version", string.Empty, NcchInfo.sdk_version, 1);
                         }
                         if (NcchInfo.req_kernel != null)
                         {
-                            f.AddListItem(string.Empty, string.Empty, "Required Kernel Version", string.Empty, NcchInfo.req_kernel, 1 - mod);
+                            f.AddListItem(string.Empty, string.Empty, "Required Kernel Version", string.Empty, NcchInfo.req_kernel, 1);
                         }
                     }
+                    
 
                     f.AddListItem(0x000, 0x100, "RSA-2048 signature of the NCCH header [SHA-256]", Header.NCCHHeaderSignature, 2-mod);
 
                     f.AddListItem(0x100, 4, "Magic (='NCCH')", Header.Magic, 3-mod);
                     f.AddListItem(0x104, 4, NcchInfo.ncch_type + " length [media units]", Header.CXILength, 3-mod);
-                    f.AddListItem(0x108, 8, "Title ID", NcchInfo.TitleID, 3-mod);
+                    f.AddListItem(0x108, 8, "Title ID", Header.TitleID, 3-mod);
                     f.AddListItem(0x110, 2, "Maker Code", Header.MakerCode, 3-mod);
                     f.AddListItem(0x112, 2, NcchInfo.ncch_type + " Version", Header.Version, 3-mod);
-                    f.AddListItem(0x118, 8, "Program ID", NcchInfo.ProgramID, 3-mod);
+                    f.AddListItem(0x118, 8, "Program ID", Header.ProgramID, 3-mod);
                     f.AddListItem(0x120, 0x10, "Reserved", Header.Unknown0_0, 3-mod);
                     f.AddListItem(0x130, 0x20, "Logo Region Hash", Header.LogoRegionHash, 3-mod);
                     f.AddListItem(0x150, 0x10, "Product Code", Header.ProductCode, 3-mod);
@@ -375,14 +377,29 @@ namespace _3DSExplorer.Modules
            
             // Getting Media Unit
             NcchInfo.media_unit = (UInt32)(0x200 * Math.Pow(2, Header.Flags[6]));
+            NcchInfo.ncch_size = (ulong)Header.CXILength * (ulong)NcchInfo.media_unit;
             DetermineContentType();
             DetermineCrypto();
             EndianSwap_IDs();
+            GetNCCHSizeString();
             if (Header.PlainRegionSize > 0) 
             {
                 ExtractPlainRegionDetails();
             }
             
+        }
+
+        public void EndianSwapByteArray(byte[] array)
+        {
+            byte[] tmp = new byte[array.Length];
+            for (int i = 0; i < array.Length; i++)
+            {
+                tmp[i] = array[array.Length - 1 - i];
+            }
+            for (int i = 0; i < array.Length; i++)
+            {
+                array[i] = tmp[i];
+            }
         }
 
         public void ExtractPlainRegionDetails()
@@ -406,7 +423,7 @@ namespace _3DSExplorer.Modules
                     char[] micro = new char[4];
                     char[] rev = new char[4];
                     char[] patch = new char[50];
-                    char[] strcheck = PlainRegion.PlainRegionStrings[i].ToCharArray();
+                    string strcheck = PlainRegion.PlainRegionStrings[i];
                     while (strcheck.Length != j)
                     {
                         if (strcheck[j] == '_' || strcheck[j] == ']')
@@ -494,7 +511,7 @@ namespace _3DSExplorer.Modules
                     char[] major = new char[4];
                     char[] minor = new char[4];
                     char[] build = new char[4];
-                    char[] strcheck = PlainRegion.PlainRegionStrings[i].ToCharArray();
+                    string strcheck = PlainRegion.PlainRegionStrings[i];
                     while (strcheck.Length != j)
                     {
                         if (strcheck[j] == '_' || strcheck[j] == ']')
@@ -572,19 +589,18 @@ namespace _3DSExplorer.Modules
 
         public bool strncmp(string a, string b, int len)
         {
-            char[] a_str = a.ToCharArray();
-            char[] b_str = b.ToCharArray();
             for (int i = 0; i < len; i++)
             {
-                if ((a_str.Length == i || b_str.Length == i) & !(a_str.Length == i && b_str.Length == i))
-                {
-                    return false;
-                }
-                if (a_str.Length == i && b_str.Length == i)
+                if (a.Length == i && b.Length == i)
                 {
                     return true;
                 }
-                if (a_str[i] != b_str[i])
+                if (a.Length == i || b.Length == i)
+                {
+                    return false;
+                }
+                
+                if (a[i] != b[i])
                 {
                     return false;
                 }
@@ -595,23 +611,23 @@ namespace _3DSExplorer.Modules
         public void DetermineContentType()
         {
             // Getting NCCH Type
-            NcchInfo.content_type = Header.Flags[5];
-            if ((NcchInfo.content_type & 0x1) == 0x1 && (NcchInfo.content_type & 0x2) != 0x2)
+            int content_type = Header.Flags[5];
+            if ((content_type & 0x1) == 0x1 && (content_type & 0x2) != 0x2)
             {
                 NcchInfo.IsCfa = true;
                 NcchInfo.ncch_type = "CFA";
-                if ((NcchInfo.content_type & 0x8) == 0x8 && (NcchInfo.content_type & 0x4) != 0x4)
+                if ((content_type & 0x8) == 0x8 && (content_type & 0x4) != 0x4)
                     NcchInfo.content_type_str = "E-Manual";
-                else if ((NcchInfo.content_type & (0x4 | 0x8)) == (0x4 | 0x8))
+                else if ((content_type & (0x4 | 0x8)) == (0x4 | 0x8))
                     NcchInfo.content_type_str = "DownloadPlay Child";
-                else if ((NcchInfo.content_type & 0x4) == 0x4 && (NcchInfo.content_type & 0x8) != 0x8)
+                else if ((content_type & 0x4) == 0x4 && (content_type & 0x8) != 0x8)
                     NcchInfo.content_type_str = "Update Data";
             }
-            else if ((NcchInfo.content_type & 0x2) == 0x2)
+            else if ((content_type & 0x2) == 0x2)
             {
                 NcchInfo.IsCfa = false;
                 NcchInfo.ncch_type = "CXI";
-                if ((NcchInfo.content_type & 0x1) == 0x1)
+                if ((content_type & 0x1) == 0x1)
                 {
                     NcchInfo.content_type_str = "Executable Content";
                 }
@@ -624,46 +640,54 @@ namespace _3DSExplorer.Modules
 
         public void DetermineCrypto()
         {
-            NcchInfo.crypto_type = Header.Flags[7];
+            int crypto_type = Header.Flags[7];
 
             // Getting Crypto Type
-            if ((NcchInfo.crypto_type & 0x1) == 0x1)
+            if ((crypto_type & 0x1) == 0x1)
             {
-                if ((NcchInfo.crypto_type & 0x4) == 0x4)
+                if ((crypto_type & 0x4) == 0x4)
                 {
                     NcchInfo.encryption = "Not Encrypted";
-                    NcchInfo.crypto = (int)NCCH_Crypto.None;
+                    NcchInfo.crypto_type = (int)NCCH_Crypto.None;
                 }
                 else if ((Header.ProgramID[4] & 0x10) == 0x10)
                 {
                     NcchInfo.encryption = "System Fixed Key";
-                    NcchInfo.crypto = (int)NCCH_Crypto.SystemFixed;
+                    NcchInfo.crypto_type = (int)NCCH_Crypto.SystemFixed;
                 }
                 else
                 {
                     NcchInfo.encryption = "Zeros Key";
-                    NcchInfo.crypto = (int)NCCH_Crypto.Zeros;
+                    NcchInfo.crypto_type = (int)NCCH_Crypto.Zeros;
                 }
             }
-            else if (NcchInfo.crypto_type == 0)
+            else if (crypto_type == 0)
             {
                 NcchInfo.encryption = "Secure Key";
-                NcchInfo.crypto = (int)NCCH_Crypto.Secure;
+                NcchInfo.crypto_type = (int)NCCH_Crypto.Secure;
             }
         }
 
         public void EndianSwap_IDs()
         {
-            // Getting TitleID/ProgramID/UniqueID
-            NcchInfo.TitleID = new byte[8];
-            NcchInfo.ProgramID = new byte[8];
-            for (int i = 0; i < 8; i++)
-            {
-                NcchInfo.TitleID[i] = Header.TitleID[7 - i];
-                NcchInfo.ProgramID[i] = Header.ProgramID[7 - i];
-            }
             NcchInfo.UniqueID = BitConverter.ToUInt32(Header.ProgramID, 1);
             NcchInfo.UniqueID = NcchInfo.UniqueID & 0xffffff;
+            EndianSwapByteArray(Header.TitleID);
+            EndianSwapByteArray(Header.ProgramID);
+        }
+
+        public void GetNCCHSizeString()
+        {
+            if (NcchInfo.ncch_size < (long)SizeUnits.MB)
+            {
+                UInt64 size = NcchInfo.ncch_size / (UInt64)SizeUnits.KB;
+                NcchInfo.ncch_size_str = size.ToString("D") + " KB";
+            }
+            else
+            {
+                UInt64 size = NcchInfo.ncch_size / (long)SizeUnits.MB;
+                NcchInfo.ncch_size_str = size.ToString("D") + " MB";
+            }
         }
 
         public void Activate(string filePath, int type, object[] values)
@@ -767,13 +791,9 @@ namespace _3DSExplorer.Modules
         public string GetFileFilter()
         {
             if (NcchInfo.IsCfa)
-            {
                 return "CTR File Archive (*.cfa)|*.cfa";
-            }
             else 
-            {
                 return "CTR Executable Image (*.cxi)|*.cxi";
-            }
         }
 
         public TreeNode GetExplorerTopNode()

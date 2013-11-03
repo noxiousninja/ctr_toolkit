@@ -373,7 +373,7 @@ namespace _3DSExplorer.Modules
             NcsdInfo.media_unit = (UInt32)(0x200 * Math.Pow(2, Header.Flags[(int)NCSD_Flags.MEDIA_UNIT_SIZE]));
             
             NcsdInfo.CCI_File_Size = (UInt64)fs.Length; // Size of CCI file
-            NcsdInfo.Media_Size = Header.CCILength * NcsdInfo.media_unit; // Size of Media
+            NcsdInfo.Media_Size = (ulong)Header.CCILength * (ulong)NcsdInfo.media_unit; // Size of Media
             GetCCI_DataSize(); // Size used up by actual CCI data
             
             // Checking Status of CCI file
@@ -418,36 +418,29 @@ namespace _3DSExplorer.Modules
             }
         }
 
+        public void EndianSwapByteArray(byte[] array)
+        {
+            byte[] tmp = new byte[array.Length];
+            for (int i = 0; i < array.Length; i++)
+            {
+                tmp[i] = array[array.Length - 1 - i];
+            }
+            for (int i = 0; i < array.Length; i++)
+            {
+                array[i] = tmp[i];
+            }
+        }
+
         public void EndianSwap_TitleIDs()
         {
             byte[] tmp = new byte[8];
             for (int i = 0; i < 8; i++)
             {
-                for (int j = 0; j < 8; j++) 
-                {
-                    tmp[j] = Header.NCCHTitleIDs[i].ID[7 - j];
-                }
-                for (int j = 0; j < 8; j++)
-                {
-                    Header.NCCHTitleIDs[i].ID[j] = tmp[j];
-                }
+                EndianSwapByteArray(Header.NCCHTitleIDs[i].ID);
             }
-            for (int i = 0; i < 8; i++)
-            {
-                tmp[i] = Header.MainTitleID[7 - i];
-            }
-            for (int i = 0; i < 8; i++)
-            {
-                Header.MainTitleID[i] = tmp[i];
-            }
-            for (int i = 0; i < 8; i++)
-            {
-                tmp[i] = Header.CVerTitleId[7 - i];
-            }
-            for (int i = 0; i < 8; i++)
-            {
-                Header.CVerTitleId[i] = tmp[i];
-            }
+            EndianSwapByteArray(Header.MainTitleID);
+            EndianSwapByteArray(Header.CVerTitleId);
+            EndianSwapByteArray(Header.MediaID);
         }
 
         public void InterpreteNCSD_Flags()
@@ -481,10 +474,10 @@ namespace _3DSExplorer.Modules
 
         public void GetCCI_DataSize()
         {
-            NcsdInfo.CCI_Data_Size = Header.CXIEntries[0].Offset * NcsdInfo.media_unit;
+            NcsdInfo.CCI_Data_Size = (ulong)Header.CXIEntries[0].Offset * (ulong)NcsdInfo.media_unit;
             for (int i = 0; i < 8; i++)
             {
-                NcsdInfo.CCI_Data_Size += Header.CXIEntries[i].Length * NcsdInfo.media_unit;
+                NcsdInfo.CCI_Data_Size += (ulong)Header.CXIEntries[i].Length * (ulong)NcsdInfo.media_unit;
                 if (i == 6)
                 {
                     NcsdInfo.CCI_S_Trimmed_Size = NcsdInfo.CCI_Data_Size;
