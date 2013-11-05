@@ -26,7 +26,7 @@ int SetupContent(USER_CONTEXT *ctx)
 	if(ctx->flags[verbose]) { printf("[+] Preparing CIA Content\n"); }
 	u64 TotalContentSize = 0;
 	for(u16 i = 0; i < ctx->ContentCount; i++){
-		if(ctx->flags[build_mode] != rom_conv){
+		if(ctx->flags[build_mode] != cci_conv){
 			u64 Size = GetFileSize_u64(ctx->ContentInfo[i].file_path);
 			ctx->ContentInfo[i].content_size = Size + GetContentPaddingSize(Size,0x10);
 		}
@@ -43,7 +43,7 @@ int SetupContent(USER_CONTEXT *ctx)
 	u64 ContentOffsetStart = 0;
 	for(u16 i = 0; i < ctx->ContentCount; i++){
 		u64 TrueSize = 0;
-		if(ctx->flags[build_mode] == rom_conv)
+		if(ctx->flags[build_mode] == cci_conv)
 			TrueSize = ctx->ContentInfo[i].content_size;
 		else
 			TrueSize = GetFileSize_u64(ctx->ContentInfo[i].file_path);

@@ -160,7 +160,7 @@ int GetContentData(USER_CONTEXT *ctx, int argc, char *argv[])
 			}
 		}
 	}
-	else if(ctx->flags[build_mode] == rom_conv){
+	else if(ctx->flags[build_mode] == cci_conv){
 		for(int i = 0; i < ctx->ContentCount; i++){
 			for(int j = 0; j < 8; j++){
 				if(ctx->ncsd_struct->partition_data[j].active == True){
@@ -277,9 +277,9 @@ int GetCoreData(USER_CONTEXT *ctx, int argc, char *argv[])
 		}
 		ctx->ContentCount = 1;
 	}
-	else if(ctx->flags[build_mode] == rom_conv){
+	else if(ctx->flags[build_mode] == cci_conv){
 		for(int i = 1; i < argc && ctx->core_infile.arg_len == 0; i++){
-			if(strncmp(argv[i],"--rom=",6) == 0){
+			if(strncmp(argv[i],"--cci=",6) == 0){
 				ctx->core_infile.arg_len = strlen(argv[i]+6);
 				ctx->core_infile.argument = malloc(ctx->core_infile.arg_len+1);
 				if(ctx->core_infile.argument == NULL){
@@ -352,8 +352,8 @@ int SetBooleanSettings(USER_CONTEXT *ctx, int argc, char *argv[])
 		else if(strncmp(argv[i],"--srl=",6) == 0){
 			ctx->flags[build_mode] = twl_cia;
 		}
-		else if(strncmp(argv[i],"--rom=",6) == 0){
-			ctx->flags[build_mode] = rom_conv;
+		else if(strncmp(argv[i],"--cci=",6) == 0){
+			ctx->flags[build_mode] = cci_conv;
 		}
 	}
 	if(ctx->flags[build_mode] == 0){

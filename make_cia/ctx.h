@@ -33,7 +33,7 @@ typedef enum
 {
 	ctr_norm = 1,
 	twl_cia,
-	rom_conv
+	cci_conv
 } cia_build_mode;
 
 typedef enum
@@ -67,8 +67,8 @@ typedef struct
 	DEV_CARD_INFO_HEADER dev_card_info;
 	**/
 	
-	u64 rom_size;
-	u64 used_rom_size;
+	u64 cci_size;
+	u64 used_cci_size;
 	PARTITION_DATA partition_data[8];
 } NCSD_STRUCT;
 

@@ -67,7 +67,7 @@ typedef struct
 typedef struct
 {
 	u8 magic[4];
-	u8 rom_size[4];
+	u8 cci_size[4];
 	u8 title_id[8];
 	u8 partitions_fs_type[8];
 	u8 partitions_crypto_type[8];
@@ -84,7 +84,7 @@ typedef struct
 {
 	u8 card_info[8];
 	u8 reserved_0[0xf8];
-	u8 rom_size_used[8];
+	u8 cci_size_used[8];
 	u8 reserved_1[0x18];
 	u8 cver_title_id[8];
 	u8 cver_title_version[2];
@@ -115,8 +115,8 @@ typedef struct
 	CARD_INFO_HEADER card_info;
 	DEV_CARD_INFO_HEADER dev_card_info;
 	
-	u64 rom_size;
-	u64 used_rom_size;
+	u64 cci_size;
+	u64 used_cci_size;
 	PARTITION_DATA partition_data[8];
 } NCSD_STRUCT;
 **/
