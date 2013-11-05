@@ -41,7 +41,7 @@ typedef struct
 	CERT_BUFF ticket;
 	CERT_BUFF tmd;
 } __attribute__((__packed__))
-CERTIFICATE_CONTEXT;
+CERT_CONTEXT;
 
 
 typedef struct

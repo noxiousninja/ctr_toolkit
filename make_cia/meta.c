@@ -45,7 +45,7 @@ int GenerateMeta(USER_CONTEXT *ctx)
 		offset = 0;
 		ncch = fopen(ctx->ContentInfo[0].file_path,"rb");
 	}
-	else if(ctx->flags[build_mode] == cci_conv){
+	else if(ctx->flags[build_mode] == rom_conv){
 		offset = ctx->ncsd_struct->partition_data[0].offset;
 		ncch = fopen(ctx->core_infile.argument,"rb");
 	}

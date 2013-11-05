@@ -164,6 +164,6 @@ void help(char *app_name)
 	printf(" --certs=               File-in               Certificate Chain File\n");
 	printf("SPECIAL BUILD OPTIONS\n");
 	printf(" --srl=                 File-in               Specify a SRL for content0.\n");
-	printf(" --cci=                 File-in               Convert CCI to CIA.\n");
+	printf(" --rom=                 File-in               Convert ROM to CIA.\n");
 	//printf(" --cdn=                 Dir-in                Re-package CDN Content to CIA\n"); // eventually make_cdn_cia will be merged with make_cia
 }

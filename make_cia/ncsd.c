@@ -48,22 +48,22 @@ int GetNCSDData(USER_CONTEXT *ctx, NCSD_STRUCT *ncsd_struct, FILE *ncsd)
 	
 	ncsd_struct->sig_valid = ctr_rsa(ncsd_struct->ncsd_header_hash,ncsd_struct->signature,ctx->keys.NcsdCfa.n,NULL,RSA_2048_SHA256,CTR_RSA_VERIFY);
 	
-	u32 media_unit_size = ((header.partition_flags[6] + 1)*0x200);
+	u32 media_size = ((header.partition_flags[6] + 1)*0x200);
 	
-	ncsd_struct->cci_size = u8_to_u32(header.cci_size,LE)*media_unit_size;
-	ncsd_struct->used_cci_size = 0;
-	if(ncsd_struct->used_cci_size == 0){
+	ncsd_struct->rom_size = u8_to_u32(header.rom_size,LE)*media_size;
+	ncsd_struct->used_rom_size = 0;
+	if(ncsd_struct->used_rom_size == 0){
 		u32 tmp = u8_to_u32(header.offsetsize_table[0].offset,LE);
 		for(int i = 0; i < 8; i++){
 			tmp += u8_to_u32(header.offsetsize_table[i].size,LE);
 		}
-		ncsd_struct->used_cci_size = tmp*media_unit_size;
+		ncsd_struct->used_rom_size = tmp*media_size;
 	}
 		
 	
 	for(int i = 0; i < 8; i++){
-		ncsd_struct->partition_data[i].offset = u8_to_u32(header.offsetsize_table[i].offset,LE)*media_unit_size;
-		ncsd_struct->partition_data[i].size = u8_to_u32(header.offsetsize_table[i].size,LE)*media_unit_size;
+		ncsd_struct->partition_data[i].offset = u8_to_u32(header.offsetsize_table[i].offset,LE)*media_size;
+		ncsd_struct->partition_data[i].size = u8_to_u32(header.offsetsize_table[i].size,LE)*media_size;
 		if(ncsd_struct->partition_data[i].offset != 0 && ncsd_struct->partition_data[i].size != 0)
 			ncsd_struct->partition_data[i].active = True;
 		ncsd_struct->partition_data[i].title_id = u8_to_u64(header.partition_id_table[i],LE);
@@ -250,22 +250,22 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 			memdump(stdout,"Title Key:              ",dev_card_info->TitleKey,0x10);
 			break;
 	}
-	if(ctx->cci_size >= GB){
-		printf("ROM Cart Size:          %lld GB",ctx->cci_size/GB); printf(" (%lld Gbit)\n",(ctx->cci_size/GB)*8);
+	if(ctx->rom_size >= GB){
+		printf("ROM Cart Size:          %lld GB",ctx->rom_size/GB); printf(" (%lld Gbit)\n",(ctx->rom_size/GB)*8);
 	}
 	else{
-		printf("ROM Cart Size:          %lld MB",ctx->cci_size/MB); 
-		u32 tmp = (ctx->cci_size/MB)*8;
+		printf("ROM Cart Size:          %lld MB",ctx->rom_size/MB); 
+		u32 tmp = (ctx->rom_size/MB)*8;
 		if(tmp >= 1024)
 			printf(" (%d Gbit)\n",tmp/1024);
 		else
 			printf(" (%d Mbit)\n",tmp);
 	}
-	if(ctx->used_cci_size >= MB){
-		printf("ROM Used Size:          %lld MB",ctx->used_cci_size/MB); printf(" (0x%llx bytes)\n",ctx->used_cci_size);
+	if(ctx->used_rom_size >= MB){
+		printf("ROM Used Size:          %lld MB",ctx->used_rom_size/MB); printf(" (0x%llx bytes)\n",ctx->used_rom_size);
 	}
-	else if(ctx->used_cci_size >= KB){
-		printf("ROM Used Size:          %lld KB",ctx->used_cci_size/KB); printf(" (0x%llx bytes)\n",ctx->used_cci_size);
+	else if(ctx->used_rom_size >= KB){
+		printf("ROM Used Size:          %lld KB",ctx->used_rom_size/KB); printf(" (0x%llx bytes)\n",ctx->used_rom_size);
 	}
 	printf("NCSD Title ID:          %016llx\n",u8_to_u64(header->title_id,LE));
 	memdump(stdout,"ExHeader Hash:          ",header->exheader_hash,0x20);
