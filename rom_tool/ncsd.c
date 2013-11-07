@@ -34,7 +34,7 @@ int TrimCCI(ROM_CONTEXT *ctx)
 	u64 trim_size = ctx->ncsd_struct->CCI_IMAGE_SIZE;
 	if(ctx->flags[remove_update_partition] == True && ctx->ncsd_struct->partition_data[7].active == True)trim_size = ctx->ncsd_struct->CCI_S_TRIM_SIZE;
 	if(TruncateFile_u64(ctx->romfile.argument,trim_size) != 0){
-		printf("[!] Failed to trim ROM\n");
+		printf("[!] Failed to trim CCI\n");
 		return Fail;
 	}
 	return 0;
