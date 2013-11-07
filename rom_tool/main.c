@@ -5,7 +5,7 @@
 typedef enum
 {
 	MAJOR = 3,
-	MINOR = 0
+	MINOR = 1
 } AppVer;
 
 void app_title(void);
@@ -112,11 +112,14 @@ fail_cleanup:
 void free_buffers(ROM_CONTEXT *ctx)
 {	
 	//Freeing Arguments
-	if(ctx->romfile.arg_len > 0)
+	if(ctx->romfile.arg_len)
 		free(ctx->romfile.argument);
 		
-	if(ctx->outfile.arg_len > 0)
+	if(ctx->outfile.arg_len)
 		free(ctx->outfile.argument);
+		
+	if(ctx->rw_dumpfile.arg_len > 0)
+		free(ctx->rw_dumpfile.argument);
 	
 	//Freeing ROM Data buffers
 	if(ctx->ncsd_struct_malloc_flag)
@@ -128,7 +131,7 @@ void free_buffers(ROM_CONTEXT *ctx)
 
 void app_title(void)
 {
-	printf("CTR_Toolkit - ROM TOOL\n");
+	printf("CTR_Toolkit - CCI Tool\n");
 	printf("Version %d.%d (C) 3DSGuy 2013\n",MAJOR,MINOR);
 }
 
@@ -138,11 +141,10 @@ void help(char *app_name)
 	printf("Usage: %s [options] <rom filepath>\n", app_name);
 	printf("OPTIONS            Possible Values         Explanation\n");
 	printf(" -h, --help                                Print this help.\n");
-	printf(" -i, --info                                Print 3DS ROM Info\n");
-	printf(" -p, --partition_info                      Print ROM Partition Info\n");
-	//printf(" -v, --verify_rom                          Verify ROM\n");
-	printf(" -r, --restore                             Restore(Un-Trim) 3DS ROM File.\n");
-	printf(" -t, --trim                                Trim 3DS ROM File.\n");
-	printf(" -u, --remove_update                       Removes the update partition\n");
-	printf(" -x, --extract=    Dir-out                 Extract NCSD Partitions to directory\n");
+	printf(" -i, --info                                Display CCI info\n");
+	printf(" -p, --partition_info                      Display CCI partitions\n");
+	printf(" -r, --restore                             Restore unused bytes to CCI file.\n");
+	printf(" -t, --trim                                Remove unused bytes from CCI file.\n");
+	printf(" -u, --remove_update                       Remove update data\n");
+	printf(" -x, --extract=    Dir-out                 Extract CCI partitions to directory\n");
 }

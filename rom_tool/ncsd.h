@@ -1,19 +1,13 @@
 typedef enum
 {
-	retail = 1,
-	dev_internal_SDK,
-	dev_external_SDK,
-	nand
-} ncsd_types;
-
-typedef enum
-{
-	SDK_1_0_0,
-	SDK_5_0_0
-} NCCH_Structure;
+	secure_key,
+	fixed_zeros,
+	fixed_system,
+	no_crypto
+} fixed_ncch_crypto;
 
 // Flag Enums
-typedef enum 
+typedef enum
 {
 	MEDIA_6X_SAVE_CRYPTO = 1,
 	MEDIA_CARD_DEVICE = 3,
@@ -21,7 +15,7 @@ typedef enum
 	MEDIA_TYPE_INDEX = 5,
 	MEDIA_UNIT_SIZE = 6,
 	MEDIA_CARD_DEVICE_OLD = 7
-}FlagIndex;
+} FlagIndex;
 
 typedef enum
 {
@@ -43,6 +37,16 @@ typedef enum
 	EXTENDED_DEVICE
 } _TypeIndex;
 
+typedef enum
+{
+	RomFS = 0x1,
+	ExeFS = 0x2,
+	SystemUpdate = 0x4,
+	Manual = 0x8,
+	Child = (0x4|0x8),
+	Trial = 0x10
+} ncch_content_bitmask;
+
 //
 typedef enum
 {
@@ -63,7 +67,7 @@ typedef struct
 typedef struct
 {
 	u8 magic[4];
-	u8 rom_size[4];
+	u8 media_size[4];
 	u8 title_id[8];
 	u8 partitions_fs_type[8];
 	u8 partitions_crypto_type[8];
@@ -95,7 +99,8 @@ typedef struct
 	u8 flags[8];
 	u8 plain_region_offset[4];
 	u8 plain_region_size[4];
-	u8 reserved_3[8];
+	u8 logo_region_offset[4];
+	u8 logo_region_size[4];
 	u8 exefs_offset[4];
 	u8 exefs_size[4];
 	u8 exefs_hash_size[4];
@@ -111,9 +116,10 @@ NCCH_HEADER;
 
 typedef struct
 {
-	u8 card_info[8];
+	u8 writable_address[4];
+	u8 card_info_bitmask[4];
 	u8 reserved_0[0xf8];
-	u8 rom_size_used[8];
+	u8 media_size_used[8];
 	u8 reserved_1[0x18];
 	u8 cver_title_id[8];
 	u8 cver_title_version[2];
@@ -144,8 +150,8 @@ typedef struct
 	CARD_INFO_HEADER card_info;
 	DEV_CARD_INFO_HEADER dev_card_info;
 	
-	u64 rom_size;
-	u64 used_rom_size;
+	u64 media_size;
+	u64 used_media_size;
 	PARTITION_DATA partition_data[8];
 } NCSD_STRUCT;
 **/
@@ -163,45 +169,16 @@ typedef struct
 
 **/
 
-static u8 TitleKeyHash_dev3rd[0x20] = 
-{
-	0x7D, 0x7C, 0x9A, 0x36, 0xED, 0x39, 
-	0x5D, 0xAB, 0xCF, 0xF4, 0x73, 0xC1, 
-	0x8C, 0x37, 0x9E, 0x40, 0x1D, 0x1C,
-	0x1B, 0x63, 0x2B, 0x1D, 0xE2, 0x11,
-	0x42, 0xDA, 0x6C, 0xFD, 0xF5, 0xEF,
-	0xFD, 0xE3,
-};
-
-static u8 TitleKeyHash_Empty[0x20] = 
-{
-	0x5A, 0xC6, 0xA5, 0x94, 0x5F, 0x16, 
-	0x50, 0x09, 0x11, 0x21, 0x91, 0x29, 
-	0x98, 0x4B, 0xA8, 0xB3, 0x87, 0xA0, 
-	0x6F, 0x24, 0xFE, 0x38, 0x3C, 0xE4, 
-	0xE8, 0x1A, 0x73, 0x29, 0x40, 0x65, 
-	0x46, 0x1B,
-};
-
-static u8 empty_hash[0x20] = 
-{
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00
-};
-
 int NCSDProcess(ROM_CONTEXT *ctx);
 int GetNCSDData(ROM_CONTEXT *ctx);
-int TrimROM(ROM_CONTEXT *ctx);
-int RestoreROM(ROM_CONTEXT *ctx);
-int ExtractROMPartitions(ROM_CONTEXT *ctx);
+int TrimCCI(ROM_CONTEXT *ctx);
+int RestoreCCI(ROM_CONTEXT *ctx);
+int ExtractCCIPartitions(ROM_CONTEXT *ctx);
 void WriteDummyBytes(FILE *file, u8 dummy_byte, u64 len);
 void PrintNCSDHeaderData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info);
 void PrintNCSDPartitionData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info);
-void GetCHIPFullSize(u64 ROM_CHIP_SIZE, int type);
-void GetROMUsedSize(u64 ROM_TRIM_SIZE, int type);
-void GetROMImageStatus(u64 ROM_IMAGE_FILE_SIZE, u8 ROM_IMAGE_STATUS, int type);
-void GetMin3DSFW(char *FW_STRING, CARD_INFO_HEADER *card_info);
+void GetCHIPFullSize(u64 MEDIA_SIZE, int type);
+void GetCCIDataSize(u64 CCI_IMAGE_SIZE, int type);
+void GetCCIFileStatus(u64 CCI_FILE_SIZE, u8 CCI_FILE_STATUS, int type);
+void GetMin3DSFW(/*char *FW_STRING, */CARD_INFO_HEADER *card_info);
+int GetSDKVersion(FILE *cxi, u64 plain_region_offset, u64 plain_region_size, NCSD_STRUCT *ctx);

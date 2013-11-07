@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 
 #ifdef _WIN32
 	#include <io.h>
