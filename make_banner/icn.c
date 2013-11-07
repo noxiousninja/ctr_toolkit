@@ -131,7 +131,7 @@ int icn_title_proccess(ICN_CONTEXT icn)
     return 0;
 }
 
-int icn_settings_proccess(ICN_CONTEXT *icn)
+int icn_settings_proccess(ICN_CONTEXT icn)
 {
 	/** Creating Buffer **/	
 	u8 buff[100];
@@ -381,6 +381,7 @@ int icn_settings_proccess(ICN_CONTEXT *icn)
 		return OPTM_BNR_FAIL;
 	}
     
+	
 	/** Processing IDs **/
 	fseek(icn.bsf, 0x00, SEEK_SET);
 	if(key_search("IDs", icn.bsf) == FOUND){
@@ -388,6 +389,7 @@ int icn_settings_proccess(ICN_CONTEXT *icn)
 		//MatchMaker ID
 		if(get_value(buff,0x8,"MatchMakerID",icn.bsf) == FOUND){
 			char_to_int_array(icn.settings.match_maker_id, buff, sizeof(icn.settings.match_maker_id), LITTLE_ENDIAN, HEX);
+			printf("Not MMID\n");
 		}
 		else{
 			value_find_fail("MatchMakerID");
@@ -396,7 +398,9 @@ int icn_settings_proccess(ICN_CONTEXT *icn)
 		//MatchMakerBIT ID
 		fseek(icn.bsf, pos0, SEEK_SET);
 		if(get_value(buff,0x10,"MatchMakerBITID",icn.bsf) == FOUND){
+			printf("Is MMBID\n");
 			char_to_int_array(icn.settings.match_maker_bit_id, buff, sizeof(icn.settings.match_maker_bit_id), LITTLE_ENDIAN, HEX);
+			printf("Not MMBID\n");
 		}
 		else{
 			value_find_fail("MatchMakerBITID");
@@ -406,6 +410,7 @@ int icn_settings_proccess(ICN_CONTEXT *icn)
 		fseek(icn.bsf, pos0, SEEK_SET);
 		if(get_value(buff,0x8,"CECID",icn.bsf) == FOUND){
 			char_to_int_array(icn.settings.cec_id, buff, sizeof(icn.settings.cec_id), LITTLE_ENDIAN, HEX);
+			printf("Not CECID\n");
 		}
 		else{
 			value_find_fail("CECID");
@@ -417,6 +422,8 @@ int icn_settings_proccess(ICN_CONTEXT *icn)
 		return ID_FAIL;
 	}
 	
+	
+	
     /** Writing To File **/
     fseek(icn.output, FLAG_OFFSET, SEEK_SET);
     fwrite(&icn.settings, sizeof(icn.settings), 1, icn.output);
@@ -427,7 +434,7 @@ int icn_settings_proccess(ICN_CONTEXT *icn)
 
 void icn_icon_proccess(ICN_CONTEXT icn)
 {
-    //Temporarally Storing Icon Data
+    //Temporarily Storing Icon Data
     u8 small_buff[SMALL_ICON_SIZE];
     u8 large_buff[LARGE_ICON_SIZE];
     fseek(icn.small, 0x0, SEEK_SET);
