@@ -1,7 +1,61 @@
-CTR_Toolkit - make_cia - Generates CIA files
-Version: 6.4 2013 (C) 3DSGuy
+#### CTR_Toolkit - make_cia - Generates CIA files ####
+#### Version: 6.4 2013 (C) 3DSGuy ####
 
-/******** Change Log ********/
+
+
+### Usage ###
+
+Usage: make_cia <options>
+OPTIONS                 Possible Values       Explanation
+ -h, --help                                   Print this help.
+ -v, --verbose                                Enable verbose output.
+ -p, --info                                   Print Info.
+ -k, --showkeys                               Show the keys being used.
+ -e, --encrypt                                Globally Encrypt CIA Contents
+ -o, --out=             File-out              CIA Output
+CONTENT OPTIONS
+ --contentX=            File-in               Content X path
+ --id_X=                Value                 Content X ID
+ --index_X=             Value                 Content X Index
+ --crypt_X                                    Encrypt Content X
+ --optional_X                                 Flag Content X as 'Optional'
+ --shared_X                                   Flag Content X as 'Shared'
+EXTRA OPTIONS
+ -0, --savesize=        Value                 Savedata Size in KB
+ -1, --tikID=           Value                 Ticket ID
+ -2, --titleID=         Value                 Title ID
+ -3, --major=           Value                 TMD Version Major
+ -4, --minor=           Value                 TMD Version Minor
+ -5, --micro=           Value                 TMD Version Micro
+ -6, --tikmajor=        Value                 TIK Version Major
+ -7, --tikminor=        Value                 TIK Version Minor
+ -8, --tikmicro=        Value                 TIK Version Micro
+CRYPTOGRAPHY OPTIONS
+ --ckey=                Value                 Common Key
+ --ckeyID=              Value                 Common Key ID
+ --cxikey=              Value                 CXI Key
+ --forcecxikey                                Overide Fixed CXI keyslots with user CXI Key
+ --titlekey=            Value                 Title Key
+ --rand                                       Use a Random Title Key
+ --tmdkey=              File-in               TMD RSA Keyfile
+ --tikkey=              File-in               TIK RSA Keyfile
+ --certs=               File-in               Certificate Chain File
+SPECIAL BUILD OPTIONS
+ --srl=                 File-in               Specify a SRL for content0.
+ --rom=                 File-in               Convert ROM to CIA.
+
+### Examples ###
+
+make_cia --srl=test.nds -o test.cia
+make_cia --rom=test.cci -o test.cia
+make_cia --content0=test.cxi -o test.cia
+ 
+NOTE: The nature of this program lets you have a larger "input" into the CIA creation process(in contrast to ctr_makecia32), so a wide variety of titles(and some not yet created at time of writing) can still be packaged with this program. However this also means that incorrect input can lead to invalid CIAs, so be careful.
+
+### Credits ###
+A big thanks to neimod, as the API for the polarssl crypto lib is based on his implementation in ctrtool. And special thanks to Jl12 and yellows8.
+
+### Change Log ###
 
 Version 6.4:
 * Allowances have been made for ECC signature handling, when it becomes part of polarssl
@@ -74,55 +128,3 @@ Version 3.0:
 * Initial Public release
 * Supports generating valid CIA files
 * Supports generating CIA files for CTR 
-
-/******** Usage: ********/
-
-Usage: make_cia <options>
-OPTIONS                 Possible Values       Explanation
- -h, --help                                   Print this help.
- -v, --verbose                                Enable verbose output.
- -p, --info                                   Print Info.
- -k, --showkeys                               Show the keys being used.
- -e, --encrypt                                Globally Encrypt CIA Contents
- -o, --out=             File-out              CIA Output
-CONTENT OPTIONS
- --contentX=            File-in               Content X path
- --id_X=                Value                 Content X ID
- --index_X=             Value                 Content X Index
- --crypt_X                                    Encrypt Content X
- --optional_X                                 Flag Content X as 'Optional'
- --shared_X                                   Flag Content X as 'Shared'
-EXTRA OPTIONS
- -0, --savesize=        Value                 Savedata Size in KB
- -1, --tikID=           Value                 Ticket ID
- -2, --titleID=         Value                 Title ID
- -3, --major=           Value                 TMD Version Major
- -4, --minor=           Value                 TMD Version Minor
- -5, --micro=           Value                 TMD Version Micro
- -6, --tikmajor=        Value                 TIK Version Major
- -7, --tikminor=        Value                 TIK Version Minor
- -8, --tikmicro=        Value                 TIK Version Micro
-CRYPTOGRAPHY OPTIONS
- --ckey=                Value                 Common Key
- --ckeyID=              Value                 Common Key ID
- --cxikey=              Value                 CXI Key
- --forcecxikey                                Overide Fixed CXI keyslots with user CXI Key
- --titlekey=            Value                 Title Key
- --rand                                       Use a Random Title Key
- --tmdkey=              File-in               TMD RSA Keyfile
- --tikkey=              File-in               TIK RSA Keyfile
- --certs=               File-in               Certificate Chain File
-SPECIAL BUILD OPTIONS
- --srl=                 File-in               Specify a SRL for content0.
- --rom=                 File-in               Convert ROM to CIA.
-
-Examples:
-
-make_cia --srl=test.nds -o test.cia
-make_cia --rom=test.cci -o test.cia
-make_cia --content0=test.cxi -o test.cia
- 
-NOTE: The nature of this program lets you have a larger "input" into the CIA creation process(in contrast to ctr_makecia32), so a wide variety of titles(and some not yet created at time of writing) can still be packaged with this program. However this also means that incorrect input can lead to invalid CIAs, so be careful.
-
-/******** Credits ********/
-A big thanks to neimod, as the API for the polarssl crypto lib is based on his implementation in ctrtool. And special thanks to Jl12 and yellows8.
