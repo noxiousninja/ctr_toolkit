@@ -9,7 +9,7 @@ int NCSDProcess(CCI_CONTEXT *ctx)
 		
 	if(!ctx->ncsd_struct->CCI_FILE_STATUS){
 		printf("[!] CCI is malformed\n");
-		//return Fail;
+		return Fail;
 	}
 		
 	if(ctx->flags[extract] == True){
@@ -127,12 +127,14 @@ int GetNCSDData(CCI_CONTEXT *ctx)
 	else if(ctx->ncsd_struct->CCI_FILE_SIZE == ctx->ncsd_struct->CCI_IMAGE_SIZE) ctx->ncsd_struct->CCI_FILE_STATUS = IS_TRIM;
 	else if(ctx->ncsd_struct->CCI_FILE_SIZE == ctx->ncsd_struct->CCI_S_TRIM_SIZE) ctx->ncsd_struct->CCI_FILE_STATUS = IS_S_TRIM;
 	else {
+		/*
 		printf("CCI_FILE_SIZE = 0x%llx\n",ctx->ncsd_struct->CCI_FILE_SIZE);
 		printf("MEDIA_SIZE = 0x%llx\n",ctx->ncsd_struct->MEDIA_SIZE);
 		printf("CCI_IMAGE_SIZE = 0x%llx\n",ctx->ncsd_struct->CCI_IMAGE_SIZE);
 		printf("CCI_S_TRIM_SIZE = 0x%llx\n",ctx->ncsd_struct->CCI_S_TRIM_SIZE);
+		*/
 		ctx->ncsd_struct->CCI_FILE_STATUS = IS_MALFORMED;
-		//goto fail;
+		goto fail;
 	}
 	
 	// Storing Partition Offsets
