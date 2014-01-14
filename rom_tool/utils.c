@@ -141,19 +141,25 @@ u64 GetFileSize_u64(char *filename)
 {
 	u64 size;
 #ifdef _WIN32
-	int fh;
- 	u64 n;
-  	fh = _open( filename, 0 );
-  	n = _lseeki64(fh, 0, SEEK_END);
-	_close(fh);
-	size = (n / sizeof(short))*2;
+        int fh;
+        u64 n;
+        fh = _open( filename, 0 );
+        n = _lseeki64(fh, 0, SEEK_END);
+        _close(fh);
+        size = (n / sizeof(short))*2;
 #else
-	FILE *file = fopen(filename,"rb");
-	fseeko(file, 0L, SEEK_END);
-	size = (u64)ftello(file);
-	fclose(file);
-#endif
-	return size;
+#ifdef __linux__
+        struct stat st;
+        stat(filename, &st);
+        size = st.st_size;
+#else
+        FILE *file = fopen(filename,"rb");
+        fseeko(file, 0L, SEEK_END);
+        size = (u64)ftello(file);
+        fclose(file);
+#endif //__linux__
+#endif //_WIN32
+        return size;
 }
 
 u32 GetFileSize_u32(FILE *file)

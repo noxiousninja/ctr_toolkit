@@ -1,6 +1,7 @@
 typedef enum
 {
 	secure_key,
+	secure_key2,
 	fixed_zeros,
 	fixed_system,
 	no_crypto
@@ -9,13 +10,22 @@ typedef enum
 // Flag Enums
 typedef enum
 {
+	SecureCryptoType2Flag = 3,
+	NCCH_Platform = 4,
+	NCCH_Type = 5,
+	NCCH_MediaUnitSize = 6,
+	OtherFlag = 7
+} NcchFlagIndex;
+
+typedef enum
+{
 	MEDIA_6X_SAVE_CRYPTO = 1,
 	MEDIA_CARD_DEVICE = 3,
 	MEDIA_PLATFORM_INDEX = 4,
 	MEDIA_TYPE_INDEX = 5,
 	MEDIA_UNIT_SIZE = 6,
 	MEDIA_CARD_DEVICE_OLD = 7
-} FlagIndex;
+} NcsdFlagIndex;
 
 typedef enum
 {
@@ -50,12 +60,12 @@ typedef enum
 //
 typedef enum
 {
-	EUR_ROM = 0x00017102,
-	JPN_ROM = 0x00017202,
-	USA_ROM = 0x00017302,
-	CHN_ROM = 0x00017402,
-	KOR_ROM = 0x00017502,
-	TWN_ROM = 0x00017602
+	EUR_UPDATE = 0x00017102,
+	JPN_UPDATE = 0x00017202,
+	USA_UPDATE = 0x00017302,
+	CHN_UPDATE = 0x00017402,
+	KOR_UPDATE = 0x00017502,
+	TWN_UPDATE = 0x00017602
 } CVER_UID_REGION;
 
 typedef struct
@@ -137,7 +147,13 @@ typedef struct
 	u8 TitleKey[0x10];
 	u8 CardDeviceReserved2[0xf0];
 } DEV_CARD_INFO_HEADER;
-
+/*
+typedef struct
+{
+	int Count;
+	char 
+} PLAIN_REGION_STRUCT;
+*/
 /**
 typedef struct
 {
@@ -169,16 +185,19 @@ typedef struct
 
 **/
 
-int NCSDProcess(ROM_CONTEXT *ctx);
-int GetNCSDData(ROM_CONTEXT *ctx);
-int TrimCCI(ROM_CONTEXT *ctx);
-int RestoreCCI(ROM_CONTEXT *ctx);
-int ExtractCCIPartitions(ROM_CONTEXT *ctx);
+
+
+int NCSDProcess(CCI_CONTEXT *ctx);
+int GetNCSDData(CCI_CONTEXT *ctx);
+int TrimCCI(CCI_CONTEXT *ctx);
+int RestoreCCI(CCI_CONTEXT *ctx);
+int ExtractCCIPartitions(CCI_CONTEXT *ctx);
 void WriteDummyBytes(FILE *file, u8 dummy_byte, u64 len);
 void PrintNCSDHeaderData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info);
 void PrintNCSDPartitionData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info);
 void GetCHIPFullSize(u64 MEDIA_SIZE, int type);
 void GetCCIDataSize(u64 CCI_IMAGE_SIZE, int type);
 void GetCCIFileStatus(u64 CCI_FILE_SIZE, u8 CCI_FILE_STATUS, int type);
-void GetMin3DSFW(/*char *FW_STRING, */CARD_INFO_HEADER *card_info);
+void GetCUPVersion(/*char *FW_STRING, */CARD_INFO_HEADER *card_info);
+//int GetPlainRegionStrings(FILE *cxi, u64 plain_region_offset, u64 plain_region_size, char *MiddleWareString[100]);
 int GetSDKVersion(FILE *cxi, u64 plain_region_offset, u64 plain_region_size, NCSD_STRUCT *ctx);

@@ -15,6 +15,7 @@ typedef enum
 {
 	_unknown = 0,
 	CXI,
+	CFA_Simple,
 	CFA_Manual,
 	CFA_DLPChild,
 	CFA_Update
@@ -88,7 +89,7 @@ typedef struct
 	//Input Info
 	OPTION_CTX outfile;
 	OPTION_CTX rw_dumpfile;
-	OPTION_CTX romfile;
+	OPTION_CTX cci_file;
 	
 	//NCSD Data
 	u8 ncsd_struct_malloc_flag;
@@ -97,4 +98,4 @@ typedef struct
 	//Settings
 	u8 flags[6];
 } __attribute__((__packed__)) 
-ROM_CONTEXT;
+CCI_CONTEXT;

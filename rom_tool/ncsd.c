@@ -1,7 +1,7 @@
 #include "lib.h"
 #include "ncsd.h"
 
-int NCSDProcess(ROM_CONTEXT *ctx)
+int NCSDProcess(CCI_CONTEXT *ctx)
 {
 	ctx->ncsd_struct = malloc(sizeof(NCSD_STRUCT));
 	if(GetNCSDData(ctx) != 0)
@@ -28,30 +28,30 @@ int NCSDProcess(ROM_CONTEXT *ctx)
 	return 0;
 }
 
-int TrimCCI(ROM_CONTEXT *ctx)
+int TrimCCI(CCI_CONTEXT *ctx)
 {
 	printf("[+] Trimming CCI\n");
 	u64 trim_size = ctx->ncsd_struct->CCI_IMAGE_SIZE;
 	if(ctx->flags[remove_update_partition] == True && ctx->ncsd_struct->partition_data[7].active == True)trim_size = ctx->ncsd_struct->CCI_S_TRIM_SIZE;
-	if(TruncateFile_u64(ctx->romfile.argument,trim_size) != 0){
+	if(TruncateFile_u64(ctx->cci_file.argument,trim_size) != 0){
 		printf("[!] Failed to trim CCI\n");
 		return Fail;
 	}
 	return 0;
 }
 
-int RestoreCCI(ROM_CONTEXT *ctx)
+int RestoreCCI(CCI_CONTEXT *ctx)
 {
 	printf("[+] Restoring CCI\n");
 	if(ctx->ncsd_struct->CCI_FILE_STATUS == IS_S_TRIM){
 		printf("[!] Update Data has been removed, CCI cannot be restored\n");
 		return Fail;
 	}
-	if(TruncateFile_u64(ctx->romfile.argument,ctx->ncsd_struct->MEDIA_SIZE) != 0){
+	if(TruncateFile_u64(ctx->cci_file.argument,ctx->ncsd_struct->MEDIA_SIZE) != 0){
 		printf("[!] Failed to Restore CCI\n");
 		return Fail;
 	}
-	FILE *cci = fopen(ctx->romfile.argument,"rb+");
+	FILE *cci = fopen(ctx->cci_file.argument,"rb+");
 	fseek_64(cci,ctx->ncsd_struct->CCI_IMAGE_SIZE,SEEK_SET);
 	WriteDummyBytes(cci,0xff,(ctx->ncsd_struct->MEDIA_SIZE - ctx->ncsd_struct->CCI_IMAGE_SIZE));
 	fclose(cci);
@@ -67,22 +67,22 @@ void WriteDummyBytes(FILE *file, u8 dummy_byte, u64 len)
 	}
 }
 
-int GetNCSDData(ROM_CONTEXT *ctx)
+int GetNCSDData(CCI_CONTEXT *ctx)
 {
-	// Opening ROM
-	FILE *cci = fopen(ctx->romfile.argument,"rb");
+	// Opening CCI
+	FILE *cci = fopen(ctx->cci_file.argument,"rb");
 	if(ctx->ncsd_struct == NULL)
 		return Fail;
 	memset(ctx->ncsd_struct,0x0,sizeof(NCSD_STRUCT));
 	
-	// Getting File Size of ROM File
-	ctx->ncsd_struct->CCI_FILE_SIZE = GetFileSize_u64(ctx->romfile.argument);
+	// Getting File Size of CCI File
+	ctx->ncsd_struct->CCI_FILE_SIZE = GetFileSize_u64(ctx->cci_file.argument);
 
 	NCSD_HEADER header;
 	CARD_INFO_HEADER card_info;
 	DEV_CARD_INFO_HEADER dev_card_info;
 	
-	// Reading ROM Header Sections
+	// Reading CCI Header Sections
 	fseek(cci,0x0,SEEK_SET);
 	fread(&ctx->ncsd_struct->signature,0x100,1,cci);
 	fseek(cci,0x100,SEEK_SET);
@@ -92,7 +92,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	fseek(cci,0x1200,SEEK_SET);
 	fread(&dev_card_info,sizeof(DEV_CARD_INFO_HEADER),1,cci);
 	
-	// Checking ROM Magic
+	// Checking CCI Magic
 	if(u8_to_u32(header.magic,BE) != NCSD_MAGIC){
 		printf("[!] NCSD File is corrupt\n");
 		goto fail;
@@ -121,7 +121,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	}
 	ctx->ncsd_struct->CCI_IMAGE_SIZE = tmp*ctx->ncsd_struct->MEDIA_UNIT_SIZE;
 	
-	// Comparing ROM File Size, with calculated size
+	// Comparing CCI File Size, with calculated size
 	ctx->ncsd_struct->CCI_FILE_STATUS = 0;
 	if(ctx->ncsd_struct->CCI_FILE_SIZE == ctx->ncsd_struct->MEDIA_SIZE) ctx->ncsd_struct->CCI_FILE_STATUS = IS_FULL;
 	else if(ctx->ncsd_struct->CCI_FILE_SIZE == ctx->ncsd_struct->CCI_IMAGE_SIZE) ctx->ncsd_struct->CCI_FILE_STATUS = IS_TRIM;
@@ -180,10 +180,14 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	fread(ctx->ncsd_struct->partition_data[0].product_code,16,1,cci);
 	
 	// Checking 'other flag' for crypto settings
-	if((cxi_header.flags[7] & 1) == 1){
-		if((cxi_header.flags[7] & 4) == 4) ctx->ncsd_struct->partition_data[0].ncch_crypto_key = no_crypto;	
+	if((cxi_header.flags[OtherFlag] & 1) == 1){
+		if((cxi_header.flags[OtherFlag] & 4) == 4) ctx->ncsd_struct->partition_data[0].ncch_crypto_key = no_crypto;	
 		else if ((cxi_header.program_id[4] && 0x10) == 0x10) ctx->ncsd_struct->partition_data[0].ncch_crypto_key = fixed_system;
 		else ctx->ncsd_struct->partition_data[0].ncch_crypto_key = fixed_zeros;
+	}
+	else if(!cxi_header.flags[OtherFlag]){
+		ctx->ncsd_struct->partition_data[0].ncch_crypto_key = secure_key;
+		if(cxi_header.flags[SecureCryptoType2Flag]) ctx->ncsd_struct->partition_data[0].ncch_crypto_key = secure_key2;
 	}
 	
 	// Getting SDK Version
@@ -199,6 +203,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 		if(header.partition_flags[MEDIA_CARD_DEVICE_OLD]) ctx->ncsd_struct->SDK_VER[0] = 2;
 		if(header.partition_flags[MEDIA_CARD_DEVICE]) ctx->ncsd_struct->SDK_VER[0] = 3;
 		if(u8_to_u32(cxi_header.logo_region_offset,LE) || u8_to_u32(cxi_header.logo_region_size,LE)) ctx->ncsd_struct->SDK_VER[0] = 5;
+		if(cxi_header.flags[SecureCryptoType2Flag])  ctx->ncsd_struct->SDK_VER[0] = 6;
 	}
 	
 	
@@ -209,22 +214,38 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 		fread(&magic,4,1,cci);
 		if(u8_to_u32(magic,BE) == NCCH_MAGIC){
 			u8 flags[8];
+			u8 ProgramID[8];
 			fseek_64(cci,(ctx->ncsd_struct->partition_data[i].offset + 0x188),SEEK_SET);
 			fread(&flags,8,1,cci);
-			if( (flags[MEDIA_TYPE_INDEX] & ExeFS) != ExeFS && (flags[MEDIA_TYPE_INDEX] & RomFS) == RomFS ){
-				if((flags[MEDIA_TYPE_INDEX] & Manual) == Manual && (flags[MEDIA_TYPE_INDEX] & SystemUpdate) != SystemUpdate)
+			fseek_64(cci,(ctx->ncsd_struct->partition_data[i].offset + 0x118),SEEK_SET);
+			fread(&ProgramID,8,1,cci);
+			if( (flags[NCCH_Type] & ExeFS) != ExeFS && (flags[NCCH_Type] & RomFS) == RomFS ){
+				if((flags[NCCH_Type] & Manual) == Manual && (flags[NCCH_Type] & SystemUpdate) != SystemUpdate)
 					ctx->ncsd_struct->partition_data[i].content_type = CFA_Manual;
-				else if((flags[MEDIA_TYPE_INDEX] & Child) == Child)
+				else if((flags[NCCH_Type] & Child) == Child)
 					ctx->ncsd_struct->partition_data[i].content_type = CFA_DLPChild;
-				else if((flags[MEDIA_TYPE_INDEX] & SystemUpdate) == SystemUpdate && (flags[MEDIA_TYPE_INDEX] & Manual) != Manual)
+				else if((flags[NCCH_Type] & SystemUpdate) == SystemUpdate && (flags[NCCH_Type] & Manual) != Manual)
 					ctx->ncsd_struct->partition_data[i].content_type = CFA_Update;
 				else
-					ctx->ncsd_struct->partition_data[i].content_type = _unknown;
+					ctx->ncsd_struct->partition_data[i].content_type = CFA_Simple;
 			}
-			else if((flags[MEDIA_TYPE_INDEX] & ExeFS) == ExeFS)
+			else if((flags[NCCH_Type] & ExeFS) == ExeFS)
 				ctx->ncsd_struct->partition_data[i].content_type = CXI;
 			else
 				ctx->ncsd_struct->partition_data[i].content_type = _unknown;
+
+
+			// Checking 'other flag' for crypto settings
+			if((flags[OtherFlag] & 1) == 1){
+				if((flags[OtherFlag] & 4) == 4) ctx->ncsd_struct->partition_data[i].ncch_crypto_key = no_crypto;	
+				else if ((ProgramID[4] && 0x10) == 0x10) ctx->ncsd_struct->partition_data[i].ncch_crypto_key = fixed_system;
+				else ctx->ncsd_struct->partition_data[i].ncch_crypto_key = fixed_zeros;
+			}
+			else if(!flags[OtherFlag]){
+				ctx->ncsd_struct->partition_data[i].ncch_crypto_key = secure_key;
+				if(flags[SecureCryptoType2Flag]) ctx->ncsd_struct->partition_data[i].ncch_crypto_key = secure_key2;
+			}
+
 			fseek_64(cci,(ctx->ncsd_struct->partition_data[i].offset + 0x150),SEEK_SET);
 			fread(ctx->ncsd_struct->partition_data[i].product_code,16,1,cci);
 		}
@@ -235,7 +256,7 @@ int GetNCSDData(ROM_CONTEXT *ctx)
 	if(ctx->flags[info])
 		PrintNCSDHeaderData(ctx->ncsd_struct,&header,&card_info,&dev_card_info);
 	if(ctx->flags[part_info])
-		PrintNCSDPartitionData(ctx->ncsd_struct,&header,&card_info,&dev_card_info);
+		PrintCCIPartitionData(ctx->ncsd_struct,&header,&card_info,&dev_card_info);
 	fclose(cci);
 	return 0;
 fail:
@@ -244,9 +265,9 @@ fail:
 
 }
 
-int ExtractCCIPartitions(ROM_CONTEXT *ctx)
+int ExtractCCIPartitions(CCI_CONTEXT *ctx)
 {
-	FILE *cci = fopen(ctx->romfile.argument,"rb");
+	FILE *cci = fopen(ctx->cci_file.argument,"rb");
 	if(cci == NULL)
 		return Fail;
 		
@@ -263,7 +284,8 @@ int ExtractCCIPartitions(ROM_CONTEXT *ctx)
 				case CFA_Manual : snprintf(output,1024,"%s_%d_MANUAL.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
 				case CFA_DLPChild : snprintf(output,1024,"%s_%d_DLP.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
 				case CFA_Update : snprintf(output,1024,"%s_%d_UPDATEDATA.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
-				default: snprintf(output,1024,"%s_%d.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+				case CFA_Simple : snprintf(output,1024,"%s_%d.cfa",ctx->ncsd_struct->partition_data[i].product_code,i); break;
+				default: snprintf(output,1024,"%s_%d.bin",ctx->ncsd_struct->partition_data[i].product_code,i); break;
 			}
 			FILE *out = fopen(output,"wb");
 			if(out == NULL){
@@ -315,20 +337,20 @@ void PrintNCSDHeaderData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER
 	if(u8_to_u64(card_info->cver_title_id,LE) && u8_to_u16(card_info->cver_title_version,LE)){
 		//printf("CVer Title ID:          %016llx\n",u8_to_u64(card_info->cver_title_id,LE));
 		//printf("CVer Title Ver:         v%d\n",u8_to_u16(card_info->cver_title_version,LE));
-		GetMin3DSFW(card_info);
+		GetCUPVersion(card_info);
 	}
 	if(!header->partition_flags[MEDIA_6X_SAVE_CRYPTO] && !header->partition_flags[MEDIA_CARD_DEVICE] && !header->partition_flags[MEDIA_CARD_DEVICE_OLD]){
 		printf(" Save Crypto:           Repeating CTR Fail\n");
 	}
 	else if(!header->partition_flags[MEDIA_6X_SAVE_CRYPTO] && (header->partition_flags[MEDIA_CARD_DEVICE] || header->partition_flags[MEDIA_CARD_DEVICE_OLD])){
-		printf(" Save Crypto:           2.2.0-4 KeyY Method\n");
+		printf(" Save Crypto:           2.2.0 KeyY Method\n");
 	}
 	else if(header->partition_flags[MEDIA_6X_SAVE_CRYPTO] == 1 && !header->partition_flags[MEDIA_CARD_DEVICE_OLD]){
 		//if(header->partition_flags[MEDIA_CARD_DEVICE] == 2){
-		//	printf(" Save Crypto:           2.2.0-4 KeyY Method\n");
+		//	printf(" Save Crypto:           2.2.0 KeyY Method\n");
 		//}
 		/*else*/ if(header->partition_flags[MEDIA_CARD_DEVICE]/* == 3*/){
-			printf(" Save Crypto:           6.0.0-11 KeyY Method\n");
+			printf(" Save Crypto:           6.0.0 KeyY Method\n");
 		}
 	}
 	
@@ -346,7 +368,7 @@ void PrintNCSDHeaderData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER
 	printf(" Update Data:           %s\n",ctx->partition_data[7].active? "Yes" : "No"); 
 }
 
-void PrintNCSDPartitionData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info)
+void PrintCCIPartitionData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card_info, DEV_CARD_INFO_HEADER *dev_card_info)
 {
 	//printf("\n[+] CCI Partitions\n");
 	for(int i = 0; i < 8; i++){
@@ -372,10 +394,11 @@ void PrintNCSDPartitionData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEA
 			//printf(" Crypto Type:           %x\n",ctx->partition_data[i].crypto_type);
 			printf(" > Crypto Key:            ");
 			switch(ctx->partition_data[i].ncch_crypto_key){
-				case(fixed_zeros) : printf("Zeros Key\n"); break;
-				case(fixed_system) : printf("System Fixed Key\n"); break;
+				case(fixed_zeros) : printf("Fixed Key (Zeros)\n"); break;
+				case(fixed_system) : printf("Fixed Key (System)\n"); break;
+				case(secure_key) : printf("Secure Key (1.0.0 KeyY Method)\n"); break;
+				case(secure_key2) : printf("Secure Key (7.0.0 KeyY Method)\n"); break;
 				case(no_crypto) : printf("Not Encrypted\n"); break;
-				default : printf("Secure Key\n"); break;
 			}
 			printf(" > Offset:                0x%x\n",ctx->partition_data[i].offset);
 			printf(" > Size:                  0x%x",ctx->partition_data[i].size);
@@ -430,50 +453,57 @@ void GetCCIFileStatus(u64 CCI_FILE_SIZE, u8 CCI_FILE_STATUS, int type)
 	char string[100];
 	u64 UnitSizesBytes[2] = {MB,KB};
 	char Str_UnitSizesBytes[2][3] = {"MB","KB"};
-	char Str_ROM_Status[4][50] = {"Malformed","Full Size","Trimmed","Update Partition Removed (Not Reversible)"};
+	char Str_CCI_Status[4][50] = {"Malformed","Full Size","Trimmed","Update Partition Removed (Not Reversible)"};
 	u8 ByteIndex = 0;
 	if(CCI_FILE_SIZE < UnitSizesBytes[ByteIndex]) ByteIndex = 1;
 	
 	sprintf(string," CCI File:\n  > Size                %lld %s",(CCI_FILE_SIZE/UnitSizesBytes[ByteIndex]),Str_UnitSizesBytes[ByteIndex]);
-	sprintf(string,"%s\n  > Status              %s",string,Str_ROM_Status[CCI_FILE_STATUS]);
-	//memdump(stdout,"  > MD5           ",
+	sprintf(string,"%s\n  > Status              %s",string,Str_CCI_Status[CCI_FILE_STATUS]);
 	printf("%s\n",string);
-	return;}
+	return;
+}
 
-void GetMin3DSFW(/*char *FW_STRING, */CARD_INFO_HEADER *card_info)
+void GetCUPVersion(/*char *FW_STRING, */CARD_INFO_HEADER *card_info)
 {
 	u8 MAJOR = 0;
 	u8 MINOR = 0;
 	u8 BUILD = 0;
-	char REGION_CHAR = 'X';
+	char REGION_CHAR = ' ';
 
 	u16 CVer_ver = u8_to_u16(card_info->cver_title_version,LE);
 	u32 CVer_UID = u8_to_u32(card_info->cver_title_id,LE);
 		
 	switch(CVer_UID){
-		case EUR_ROM : REGION_CHAR = 'E'; break;
-		case JPN_ROM : REGION_CHAR = 'J'; break;
-		case USA_ROM : REGION_CHAR = 'U'; break;
-		case CHN_ROM : REGION_CHAR = 'C'; break;
-		case KOR_ROM : REGION_CHAR = 'K'; break;
-		case TWN_ROM : REGION_CHAR = 'T'; break;
+		case EUR_UPDATE : REGION_CHAR = 'E'; break;
+		case JPN_UPDATE : REGION_CHAR = 'J'; break;
+		case USA_UPDATE : REGION_CHAR = 'U'; break;
+		case CHN_UPDATE : REGION_CHAR = 'C'; break;
+		case KOR_UPDATE : REGION_CHAR = 'K'; break;
+		case TWN_UPDATE : REGION_CHAR = 'T'; break;
 	}
 	
 	
 	switch(CVer_ver){
 		case 3088 : MAJOR = 3; MINOR = 0; BUILD = 0; break;
-		default : MAJOR = CVer_ver/1024; MINOR = (CVer_ver - 1024*(CVer_ver/1024))/0x10; break;//This tends to work 98% of the time, use above for manual overides
+		default ://This tends to work most of the time, use above for manual overrides
+			MAJOR = (CVer_ver & 0x7f00) >> 10;
+			MINOR = (CVer_ver & 0x3f0) >> 4;
+			//BUILD = CVer_ver & 0xf; 
+			break;	
 	}
-	printf(" Min 3DS Firm:          %d.%d.%d-X%c\n",MAJOR,MINOR,BUILD,REGION_CHAR);
+	printf(" CUP Version:           %d.%d.%d%c\n",MAJOR,MINOR,BUILD,REGION_CHAR);
 }
 
 int GetSDKVersion(FILE *cxi, u64 plain_region_offset, u64 plain_region_size, NCSD_STRUCT *ctx)
 {
+	// Counting Strings in Plain Region
 	int string_count = 0;
 	fseek_64(cxi,plain_region_offset,SEEK_SET);
 	while (ftell(cxi) <= (u32)(plain_region_offset+plain_region_size)){
 		if(fgetc(cxi) == '[') string_count++;
 	}
+	
+	// Storing Plain Region Strings
 	fseek_64(cxi,plain_region_offset,SEEK_SET);
 	char tmp = '\0';
 	int j = 0;
@@ -491,6 +521,8 @@ int GetSDKVersion(FILE *cxi, u64 plain_region_offset, u64 plain_region_size, NCS
 		j = 0;
 	}
 	//printf("Total MDW Strings: %d\n",string_count);
+	
+	// Checking Plain Region Strings
 	int found_sdk_ver = 0;
 	char SDK_VER[3][4];
 	char FW_VER[3][4];

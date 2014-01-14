@@ -1,1 +1,1 @@
-void free_buffers(ROM_CONTEXT *ctx);
+void free_buffers(CCI_CONTEXT *ctx);

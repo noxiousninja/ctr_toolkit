@@ -5,7 +5,7 @@
 typedef enum
 {
 	MAJOR = 3,
-	MINOR = 1
+	MINOR = 2
 } AppVer;
 
 void app_title(void);
@@ -20,8 +20,8 @@ int main(int argc, char *argv[])
 		return ARGC_FAIL;
 	}
 	
-	ROM_CONTEXT *ctx = malloc(sizeof(ROM_CONTEXT));
-	memset(ctx,0x0,sizeof(ROM_CONTEXT));
+	CCI_CONTEXT *ctx = malloc(sizeof(CCI_CONTEXT));
+	memset(ctx,0x0,sizeof(CCI_CONTEXT));
 		
 	for(int i = 1; i < argc; i++){
 		if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0){
@@ -62,24 +62,24 @@ int main(int argc, char *argv[])
 			memcpy(ctx->outfile.argument,argv[i]+10,ctx->outfile.arg_len+1);
 		}
 		else if(i == argc-1){
-			ctx->romfile.arg_len = strlen(argv[i]);
-			ctx->romfile.argument = malloc(ctx->romfile.arg_len+1);
-			if(ctx->romfile.argument == NULL){
+			ctx->cci_file.arg_len = strlen(argv[i]);
+			ctx->cci_file.argument = malloc(ctx->cci_file.arg_len+1);
+			if(ctx->cci_file.argument == NULL){
 				printf("[!] MEM ERROR\n");
 				return Fail;
 			}
-			memcpy(ctx->romfile.argument,argv[i],ctx->romfile.arg_len+1);
-			FILE *rom = fopen(ctx->romfile.argument,"rb");
-			if(rom == NULL){
-				printf("[!] Failed to open '%s'\n",ctx->romfile.argument);
+			memcpy(ctx->cci_file.argument,argv[i],ctx->cci_file.arg_len+1);
+			FILE *cci = fopen(ctx->cci_file.argument,"rb");
+			if(cci == NULL){
+				printf("[!] Failed to open '%s'\n",ctx->cci_file.argument);
 				return 1;
 			}
-			fclose(rom);
+			fclose(cci);
 		}
 	}
 	
 	if(ctx->flags[restore] == True && ctx->flags[trim] == True){
-		printf("[!] You cannot trim and restore a ROM at the same time\n");
+		printf("[!] You cannot trim and restore a CCI at the same time\n");
 		help(argv[0]);
 		free_buffers(ctx);
 		return 1;
@@ -109,11 +109,11 @@ fail_cleanup:
 	return 1;
 }
 
-void free_buffers(ROM_CONTEXT *ctx)
+void free_buffers(CCI_CONTEXT *ctx)
 {	
 	//Freeing Arguments
-	if(ctx->romfile.arg_len)
-		free(ctx->romfile.argument);
+	if(ctx->cci_file.arg_len)
+		free(ctx->cci_file.argument);
 		
 	if(ctx->outfile.arg_len)
 		free(ctx->outfile.argument);
@@ -121,7 +121,7 @@ void free_buffers(ROM_CONTEXT *ctx)
 	if(ctx->rw_dumpfile.arg_len > 0)
 		free(ctx->rw_dumpfile.argument);
 	
-	//Freeing ROM Data buffers
+	//Freeing CCI Data buffers
 	if(ctx->ncsd_struct_malloc_flag)
 		free(ctx->ncsd_struct);
 	
@@ -138,7 +138,7 @@ void app_title(void)
 void help(char *app_name)
 {
 	app_title();
-	printf("Usage: %s [options] <rom filepath>\n", app_name);
+	printf("Usage: %s [options] <cci filepath>\n", app_name);
 	printf("OPTIONS            Possible Values         Explanation\n");
 	printf(" -h, --help                                Print this help.\n");
 	printf(" -i, --info                                Display CCI info\n");
