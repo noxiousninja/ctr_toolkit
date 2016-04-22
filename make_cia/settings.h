@@ -34,16 +34,6 @@ typedef struct
 } __attribute__((__packed__))
 CERT_BUFF;
 
-
-typedef struct
-{
-	CERT_BUFF ca;
-	CERT_BUFF ticket;
-	CERT_BUFF tmd;
-} __attribute__((__packed__))
-CERT_CONTEXT;
-
-
 typedef struct
 {
 	u8 modulus[0x100];
