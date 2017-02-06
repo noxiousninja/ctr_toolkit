@@ -16,6 +16,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
+#include <inttypes.h>
 #include "lib.h"
 #include "ctr_crypto.h"
 #include "ncsd.h"
@@ -231,7 +232,7 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 	switch(ctx->type){
 		case retail : 
 			printf("Target:                 Retail/Production\n"); 
-			printf("CVer Title ID:          %016llx\n",u8_to_u64(card_info->cver_title_id,LE));
+			printf("CVer Title ID:          %016"PRIx64"\n",u8_to_u64(card_info->cver_title_id,LE));
 			printf("CVer Title Ver:         v%d\n",u8_to_u16(card_info->cver_title_version,LE));
 			char *FW_STRING = malloc(10);
 			memset(FW_STRING,0,10);
@@ -251,10 +252,10 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 			break;
 	}
 	if(ctx->rom_size >= GB){
-		printf("ROM Cart Size:          %lld GB",ctx->rom_size/GB); printf(" (%lld Gbit)\n",(ctx->rom_size/GB)*8);
+		printf("ROM Cart Size:          %"PRId64" GB",ctx->rom_size/GB); printf(" (%"PRId64" Gbit)\n",(ctx->rom_size/GB)*8);
 	}
 	else{
-		printf("ROM Cart Size:          %lld MB",ctx->rom_size/MB); 
+		printf("ROM Cart Size:          %"PRId64" MB",ctx->rom_size/MB); 
 		u32 tmp = (ctx->rom_size/MB)*8;
 		if(tmp >= 1024)
 			printf(" (%d Gbit)\n",tmp/1024);
@@ -262,12 +263,12 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 			printf(" (%d Mbit)\n",tmp);
 	}
 	if(ctx->used_rom_size >= MB){
-		printf("ROM Used Size:          %lld MB",ctx->used_rom_size/MB); printf(" (0x%llx bytes)\n",ctx->used_rom_size);
+		printf("ROM Used Size:          %"PRId64" MB",ctx->used_rom_size/MB); printf(" (0x%"PRIx64" bytes)\n",ctx->used_rom_size);
 	}
 	else if(ctx->used_rom_size >= KB){
-		printf("ROM Used Size:          %lld KB",ctx->used_rom_size/KB); printf(" (0x%llx bytes)\n",ctx->used_rom_size);
+		printf("ROM Used Size:          %"PRId64" KB",ctx->used_rom_size/KB); printf(" (0x%"PRIx64" bytes)\n",ctx->used_rom_size);
 	}
-	printf("NCSD Title ID:          %016llx\n",u8_to_u64(header->title_id,LE));
+	printf("NCSD Title ID:          %016"PRIx64"\n",u8_to_u64(header->title_id,LE));
 	memdump(stdout,"ExHeader Hash:          ",header->exheader_hash,0x20);
 	printf("AddHeader Size:         0x%x\n",u8_to_u32(header->additional_header_size,LE));
 	printf("Sector 0 Offset:        0x%x\n",u8_to_u32(header->sector_zero_offset,LE));
@@ -276,7 +277,7 @@ void PrintNCSDData(NCSD_STRUCT *ctx, NCSD_HEADER *header, CARD_INFO_HEADER *card
 	for(int i = 0; i < 8; i++){
 		if(ctx->partition_data[i].active == True){
 			printf("Partition %d\n",i);
-			printf(" Title ID:              %016llx\n",ctx->partition_data[i].title_id);
+			printf(" Title ID:              %016"PRIx64"\n",ctx->partition_data[i].title_id);
 			printf(" Content Type:          ");
 			switch(ctx->partition_data[i].content_type){
 				case _unknown : printf("Unknown\n"); break;

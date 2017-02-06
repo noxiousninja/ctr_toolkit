@@ -16,6 +16,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
+#include <inttypes.h>
 #include "lib.h"
 #include "ctr_crypto.h"
 #include "settings.h"
@@ -48,7 +49,7 @@ int SetupContent(USER_CONTEXT *ctx)
 		else
 			TrueSize = GetFileSize_u64(ctx->ContentInfo[i].file_path);
 		
-		//printf("Content %d has a True size of 0x%llx and an actual Size of 0x%llx @ offset 0x%llx\n",i,TrueSize,ctx->ContentInfo[i].content_size,ctx->ContentInfo[i].file_offset);
+		//printf("Content %d has a True size of 0x%"PRIx64" and an actual Size of 0x%"PRIx64" @ offset 0x%"PRIx64"\n",i,TrueSize,ctx->ContentInfo[i].content_size,ctx->ContentInfo[i].file_offset);
 		if(ctx->flags[verbose]) { printf(" > Content%d",i); }
 
 		FILE *content_file = fopen(ctx->ContentInfo[i].file_path,"rb");
@@ -65,7 +66,7 @@ int SetupContent(USER_CONTEXT *ctx)
 		}
 		else
 			if(ctx->flags[verbose]) { printf(" [Plaintext]"); }
-		if(ctx->flags[verbose]) { printf(" [0x%llx]\n",ctx->ContentInfo[i].content_size); }
+		if(ctx->flags[verbose]) { printf(" [0x%"PRIx64"]\n",ctx->ContentInfo[i].content_size); }
 		ContentOffsetStart += ctx->ContentInfo[i].content_size;
 		fclose(content_file);
 	}	

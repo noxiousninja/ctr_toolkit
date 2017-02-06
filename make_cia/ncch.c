@@ -16,6 +16,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with make_cia.  If not, see <http://www.gnu.org/licenses/>.
 **/
+#include <inttypes.h>
 #include "lib.h"
 #include "ctr_crypto.h"
 #include "ncch.h"
@@ -126,7 +127,7 @@ int VerifyNCCH(USER_CONTEXT *ctx, u32 offset, FILE *ncch)
 {
 	NCCH_STRUCT *cxi_ctx = malloc(sizeof(NCCH_STRUCT));
 	if(cxi_ctx == NULL){
-		printf("[!] Failed to allocate memory (0x%lx bytes) for CXI Context\n",sizeof(NCCH_STRUCT));
+		printf("[!] Failed to allocate memory (0x%"PRIxPTR" bytes) for CXI Context\n",(uintptr_t)sizeof(NCCH_STRUCT));
 		return 1; 
 	}
 	memset(cxi_ctx,0x0,sizeof(NCCH_STRUCT));
@@ -275,7 +276,7 @@ int GetCXIIcon(COMPONENT_STRUCT *cxi_icon, NCCH_STRUCT *cxi_ctx, USER_CONTEXT *c
 	cxi_icon->size = icon_size;
 	cxi_icon->buffer = malloc(cxi_icon->size);
 	if(cxi_icon->buffer == NULL){
-		printf("[!] Failed to allocate memory (0x%llx bytes) for storing Icon data\n",cxi_icon->size);
+		printf("[!] Failed to allocate memory (0x%"PRIx64" bytes) for storing Icon data\n",cxi_icon->size);
 		return 1; 
 	}
 	memcpy(cxi_icon->buffer,(exefs+icon_offset),cxi_icon->size);
